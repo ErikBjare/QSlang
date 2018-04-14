@@ -1,5 +1,5 @@
 import re
-import typing as T
+from typing import List, Dict, Any
 from copy import copy
 from collections import namedtuple
 from datetime import date, time, datetime
@@ -11,7 +11,7 @@ re_amount = re.compile(r"~?[0-9\.]+(k|d|m|mcg|u|n)?(l|g|IU)?")
 Event = namedtuple("Event", ["timestamp", "type", "data"])
 
 
-def parse_data(data: str):
+def parse_data(data: str) -> List[Dict[str, Any]]:
     datas = []
     if re_amount.match(data):
         for entry in (e.strip() for e in data.split("+")):
@@ -22,8 +22,8 @@ def parse_data(data: str):
     return datas
 
 
-def parse(text: str):
-    events = []  # type: T.List[Event]
+def parse(text: str) -> None:
+    events = []  # type: List[Event]
 
     current_date = None
     for line in text.split("\n"):
@@ -49,12 +49,13 @@ def parse(text: str):
         print(f"{e.timestamp.isoformat()} [{e.type}]   \t{e.data}")
 
 
-test1 = """
-# 2018-04-14
+if __name__ == "__main__":
+    test1 = """
+    # 2018-04-14
 
-16:30 - Started working on qslang
+    16:30 - Started working on qslang
 
-18:12 - ~1dl Green tea + 5g Cocoa
-"""
+    18:12 - ~1dl Green tea + 5g Cocoa
+    """
 
-parse(test1)
+    parse(test1)
