@@ -16,7 +16,7 @@ re_roa = re.compile(r"(oral|buccal|subcut|smoked|vaporized|insuff)")
 Event = namedtuple("Event", ["timestamp", "type", "data"])
 
 
-def load_standard_notes():
+def load_standard_notes() -> List[str]:
     notes = []
     p = Path("./data/private")
     for path in p.glob("*Archive*.txt"):
@@ -42,25 +42,25 @@ def parse_data(data: str) -> List[Dict[str, Any]]:
     datas = []
     if re_amount.match(data):
         for entry in (e.strip() for e in data.split("+") if e.strip()):
-            data = {"raw": entry}
+            d = {"raw": entry}
 
             m_amount = re_amount.match(entry)
             if m_amount:
-                data["amount"] = m_amount[0]
-                entry = entry.replace(data["amount"], "").strip()
+                d["amount"] = m_amount[0]
+                entry = entry.replace(d["amount"], "").strip()
 
             m_roa = re_roa.findall(entry)
             if m_roa:
-                data["roa"] = m_roa[0]
-                entry = entry.replace(data["roa"], "").strip()
+                d["roa"] = m_roa[0]
+                entry = entry.replace(d["roa"], "").strip()
 
             m_extra = re_extra.findall(entry)
             if m_extra:
-                data["extra"] = m_extra[0].strip("()")
-                entry = entry.replace("(" + data["extra"] + ")", "").strip()
+                d["extra"] = m_extra[0].strip("()")
+                entry = entry.replace("(" + d["extra"] + ")", "").strip()
 
-            data["substance"] = entry
-            datas.append(data)
+            d["substance"] = entry
+            datas.append(d)
     return datas
 
 
@@ -75,7 +75,7 @@ def parse_time(s: str) -> Tuple[time, List[str]]:
     return t, tags
 
 
-def parse(text: str) -> None:
+def parse(text: str) -> List[Event]:
     events = []  # type: List[Event]
 
     current_date = None
@@ -89,7 +89,7 @@ def parse(text: str) -> None:
                     print(e)
             elif re_time.match(line):
                 t, tags = parse_time(line.split("-")[0].strip())
-                timestamp = datetime.combine(current_date, t)
+                timestamp = datetime.combine(current_date.date(), t)
                 data = "-".join(line.split("-")[1:]).strip()
                 if re_amount.match(data):
                     # Data entry
@@ -104,7 +104,7 @@ def parse(text: str) -> None:
     return events
 
 
-def print_event(e: Dict[str, str]):
+def print_event(e: Event) -> None:
     d = e.data
     if e.type == "data":
         e_str = f"{d['amount'] if 'amount' in d else '?'} {d['substance']}"
@@ -113,23 +113,31 @@ def print_event(e: Dict[str, str]):
     print(f"{e.timestamp.isoformat()} | {e.type.ljust(7)} | " + e_str)
 
 
-def print_events(events):
+def print_events(events: List[Event]) -> None:
     for e in events:
-        print(f"{e.timestamp.isoformat()} [{e.type}]   \t{e.data}")
+        print_event(e)
 
 
 def test_parse():
     test1 = """
     # 2018-04-14
-
     16:30 - Started working on qslang
-
     ~17:12 - Made progress
-
     18:12 - ~1dl Green tea + 5g Cocoa
     """
+    events = parse(test1)
+    assert len(events) == 4
 
-    parse(test1)
+
+def _test_parse_with_plus_in_extras():
+    # FIXME: This test doesn't pass
+    test_str = """
+    # 2018-04-14
+    12:00 - 1x Something (with a + in the extras)
+    """
+    events = parse(test_str)
+    assert len(events) == 1
+
 
 
 if __name__ == "__main__":

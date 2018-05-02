@@ -1,2 +1,4 @@
 data/private
+.cache
 .mypy_cache
+__pycache__
