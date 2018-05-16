@@ -149,7 +149,7 @@ def _test_parse_with_plus_in_extras():
 _r = re.compile(r"([0-9]+\.?[0-9]*e?-?[0-9]*)(mc|d|c|m)?(l|g)?")
 
 
-def split_amtstr(s):
+def split_amtstr(s) -> Tuple[float, str, str]:
     try:
         n, p, u = _r.findall(s)[0]
         return float(n), p, u
@@ -161,7 +161,7 @@ def test_split_amtstr():
     assert split_amtstr("0g") == (0.0, "", "g")
 
 
-def _norm_amount(n, p):
+def _norm_amount(n: float, p: str) -> float:
     if p == "d":
         n *= 0.1
     elif p == "c":
@@ -173,7 +173,7 @@ def _norm_amount(n, p):
     return n
 
 
-def _best_prefix(n) -> Tuple[str, float]:
+def _best_prefix(n: float) -> Tuple[str, float]:
     if 1e-6 <= n < 1e-3:
         return "mc", 0.000001
     elif 1e-3 <= n < 1e-0:
@@ -186,7 +186,7 @@ def _best_prefix(n) -> Tuple[str, float]:
         return "", 1
 
 
-def _fmt_amount(amount, unit):
+def _fmt_amount(amount: float, unit: str) -> str:
     p, pf = _best_prefix(amount)
     return f"{round(amount / pf, 4)}{p}{unit}"
 
@@ -198,20 +198,20 @@ class Dose:
         self.amount: float = _norm_amount(n, p)
         self.unit: str = u
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.amount_with_unit} {self.substance}"
 
     @property
     def amount_with_unit(self) -> str:
         return _fmt_amount(self.amount, self.unit)
 
-    def __add__(self, other: "Dose"):
+    def __add__(self, other: "Dose") -> "Dose":
         assert self.substance == other.substance
         assert self.unit == other.unit
         return Dose(self.substance, _sum_amount(self.amount_with_unit, other.amount_with_unit))
 
 
-def _sum_amount(a1, a2):
+def _sum_amount(a1: str, a2: str) -> str:
     n1, p1, u1 = split_amtstr(a1)
     n2, p2, u2 = split_amtstr(a2)
     assert u1 == u2  # amounts have to have the same units
@@ -233,7 +233,7 @@ def test_sum_amount():
     assert _sum_amount("33cl", "1l") == "1.33l"
 
 
-def _annotate_doses(events: List[Event]):
+def _annotate_doses(events: List[Event]) -> List[Event]:
     for e in events:
         try:
             e.data["dose"] = Dose(e.data["substance"], e.data["amount"])
@@ -243,7 +243,7 @@ def _annotate_doses(events: List[Event]):
     return events
 
 
-def _print_daily_doses(events, substance):
+def _print_daily_doses(events: List[Event], substance: str):
     events = [e for e in events if isinstance(e.data, dict) and e.data["substance"] == substance]
     events = _annotate_doses(events)
     unit = events[0].data["dose"].unit
@@ -254,10 +254,6 @@ def _print_daily_doses(events, substance):
         try:
             amt = reduce(lambda amt, e2: amt + e2.data["dose"], v, Dose(substance, f"0{unit}"))
             tot_amt += amt
-            #print(k, amt)
-            # amt = reduce(lambda amt, e2: _sum_amount(amt, e2.data["amount"]), v, "0g")
-            # tot_amt = _sum_amount(tot_amt, amt)
-            # print(k, amt, substance)
         except Exception as e:
             log.warning(f"Unable to parse amount: {e}")
     print(f"{len(grouped_by_date)} days totalling {tot_amt}, avg dose/day: {_fmt_amount(tot_amt.amount/len(events), unit)}")
