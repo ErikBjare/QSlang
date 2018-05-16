@@ -1,3 +1,4 @@
+import sys
 import re
 from typing import List, Dict, Any, Tuple, Union
 from copy import copy
@@ -149,7 +150,7 @@ def _test_parse_with_plus_in_extras():
 _r = re.compile(r"([0-9]+\.?[0-9]*e?-?[0-9]*)(mc|d|c|m)?(l|g)?")
 
 
-def split_amtstr(s) -> Tuple[float, str, str]:
+def split_amtstr(s: str) -> Tuple[float, str, str]:
     try:
         n, p, u = _r.findall(s)[0]
         return float(n), p, u
@@ -246,6 +247,9 @@ def _annotate_doses(events: List[Event]) -> List[Event]:
 def _print_daily_doses(events: List[Event], substance: str):
     events = [e for e in events if isinstance(e.data, dict) and e.data["substance"] == substance]
     events = _annotate_doses(events)
+    if not events:
+        print(f"No doses found for substance '{substance}'")
+        return
     unit = events[0].data["dose"].unit
 
     grouped_by_date = {k: list(v) for k, v in groupby(sorted(events, key=lambda e: e.timestamp.date()), key=lambda e: e.timestamp.date())}
@@ -265,10 +269,15 @@ if __name__ == "__main__":
     notes = load_standard_notes()
 
     events = [e for note in notes for e in parse(note)]
-    for e in events:
-        # print(e)
-        pass
 
-    _print_daily_doses(events, "Caffeine")
-    _print_daily_doses(events, "Beer")
-    _print_daily_doses(events, "Wine")
+    if sys.argv[1:]:
+        if sys.argv[1] == "events":
+            for e in events:
+                print(e)
+        if sys.argv[1] == "doses":
+            _print_daily_doses(events, sys.argv[2])
+    else:
+        print("Usage: python3 main.py <subcommand>")
+        print("Subcommands:")
+        print(" - events")
+        print(" - doses <substance>")
