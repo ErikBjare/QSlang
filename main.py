@@ -1,3 +1,5 @@
+#!/bin/env python3
+
 import sys
 import re
 from typing import List, Dict, Any, Tuple, Union
@@ -15,7 +17,7 @@ log = logging.getLogger(__name__)
 re_date = re.compile(r"[0-9]+-[0-9]+-[0-9]+")
 re_time = re.compile(r"[~+]*[0-9]{1,2}:[0-9]{1,2}")
 re_amount = re.compile(r"[~]?[?0-9\.]+(k|c|d|mc|m|u|n)?(l|g|IU|x)?")
-re_extra= re.compile(r"\(.*\)")
+re_extra = re.compile(r"\(.*\)")
 re_roa = re.compile(r"(oral|buccal|subcut|smoked|vaporized|insuff)")
 
 Event = namedtuple("Event", ["timestamp", "type", "data"])
@@ -263,6 +265,13 @@ def _print_daily_doses(events: List[Event], substance: str):
     print(f"{len(grouped_by_date)} days totalling {tot_amt}, avg dose/day: {_fmt_amount(tot_amt.amount/len(events), unit)}")
 
 
+def _print_usage():
+    print("Usage: python3 main.py <subcommand>")
+    print("Subcommands:")
+    print(" - events")
+    print(" - doses <substance>")
+
+
 if __name__ == "__main__":
     logging.basicConfig()
 
@@ -274,10 +283,12 @@ if __name__ == "__main__":
         if sys.argv[1] == "events":
             for e in events:
                 print(e)
-        if sys.argv[1] == "doses":
-            _print_daily_doses(events, sys.argv[2])
+        elif sys.argv[1] == "doses":
+            if len(sys.argv) < 3:
+                print("Missing argument")
+            else:
+                _print_daily_doses(events, sys.argv[2])
+        else:
+            _print_usage()
     else:
-        print("Usage: python3 main.py <subcommand>")
-        print("Subcommands:")
-        print(" - events")
-        print(" - doses <substance>")
+        _print_usage()
