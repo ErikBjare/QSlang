@@ -1,4 +1,3 @@
 data/private
-.cache
-.mypy_cache
+.*cache
 __pycache__

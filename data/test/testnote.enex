@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE en-export SYSTEM "http://xml.evernote.com/pub/evernote-export2.dtd">
+<en-export export-date="20120727T073610Z" application="Evernote" version="Evernote Mac 3.0.5 (209942)">
+<note><title>Vim Tips</title><content><![CDATA[<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE en-note SYSTEM "http://xml.evernote.com/pub/enml2.dtd">
+<en-note style="word-wrap: break-word; -webkit-nbsp-mode: space; -webkit-line-break: after-white-space;">
+yank for copy, delete for cut, put for parse
+<div><br/></div>
+<div>Move in context, not position</div>
+<div>/ search forward</div>
+<div>? search backward</div>
+<div>n repeat last search</div>
+<div>N repeat last search but in the opposite direction</div>
+<div>tx move to 'x'</div>
+<div>fx find 'x'</div>
+</en-note>
+]]></content><created>20101229T161500Z</created><updated>20101231T161039Z</updated><note-attributes/></note>
+</en-export>
