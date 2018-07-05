@@ -1,0 +1,3 @@
+[submodule "thirdparty/evernote-dump"]
+	path = thirdparty/evernote-dump
+	url = https://github.com/ErikBjare/evernote-dump.git
