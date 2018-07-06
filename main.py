@@ -2,6 +2,8 @@
 
 import sys
 import re
+import logging
+import json
 from typing import List, Dict, Any, Tuple, Union
 from copy import copy
 from collections import namedtuple
@@ -9,9 +11,6 @@ from datetime import date, time, datetime
 from pathlib import Path
 from itertools import groupby
 from functools import reduce
-import logging
-import json
-from pprint import pprint
 
 log = logging.getLogger(__name__)
 
@@ -56,6 +55,7 @@ def load_evernote() -> List[str]:
     for p in d.glob("*.md"):
         data = p.read_text()
 
+        # A bad idea for filtering away notes that were not mine, but might still be useful for tagging with metadata
         if False:
             authors = re_evernote_author.findall(data)
             if authors and "erik" not in authors[0]:
@@ -147,7 +147,7 @@ def parse(text: str) -> List[Event]:
                 try:
                     current_date = datetime.strptime(line[1:].strip().split(" - ")[0], "%Y-%m-%d")
                 except Exception as e:
-                    log.debug(e)
+                    log.debug(f"Unable to parse date: {e}")
             elif re_time.match(line):
                 if not current_date:
                     log.warning("Date unknown, skipping")
@@ -298,7 +298,7 @@ def _annotate_doses(events: List[Event]) -> List[Event]:
         try:
             e.data["dose"] = Dose(e.data["substance"], e.data["amount"])
         except Exception as exc:
-            log.warn(f"Unable to annotate dose: {exc}")
+            log.warning(f"Unable to annotate dose: {exc}")
             events.remove(e)
     return events
 
@@ -313,7 +313,7 @@ def _print_daily_doses(events: List[Event], substance: str, ignore_doses_fewer_t
 
     grouped_by_date = {k: list(v) for k, v in groupby(sorted(events, key=lambda e: e.timestamp.date()), key=lambda e: e.timestamp.date())}
     tot_amt = Dose(substance, f"0{unit}")
-    for k, v in grouped_by_date.items():
+    for _, v in grouped_by_date.items():
         try:
             amt = reduce(lambda amt, e2: amt + e2.data["dose"], v, Dose(substance, f"0{unit}"))
             tot_amt += amt
@@ -331,8 +331,6 @@ def _print_substancelist(events):
     substances = {e.data["substance"] for e in events}
     for substance in sorted(substances):
         _print_daily_doses(events, substance, ignore_doses_fewer_than=2)
-
-
 
 
 def _print_usage():
