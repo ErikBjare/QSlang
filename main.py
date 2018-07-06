@@ -11,14 +11,18 @@ from itertools import groupby
 from functools import reduce
 import logging
 import json
+from pprint import pprint
 
 log = logging.getLogger(__name__)
 
 re_date = re.compile(r"[0-9]+-[0-9]+-[0-9]+")
 re_time = re.compile(r"[~+]*[0-9]{1,2}:[0-9]{1,2}")
-re_amount = re.compile(r"[~]?[?0-9\.]+(k|c|d|mc|m|u|n)?(l|g|IU|x)?")
+re_amount = re.compile(r"[~]?[?0-9\.]+(k|c|d|mc|m|u|n)?(l|L|g|IU|x)?")
 re_extra = re.compile(r"\(.*\)")
-re_roa = re.compile(r"(oral|buccal|subcut|smoked|vaporized|insuff)")
+re_roa = re.compile(r"(orall?y?|buccal|subcut|smoked|vaporized|insuffl?a?t?e?d?|chewed|subli?n?g?u?a?l?|intranasal|spliff)")
+
+re_evernote_author = re.compile(r'>author:(.+)$')
+re_evernote_source = re.compile(r'>source:(.+)$')
 
 Event = namedtuple("Event", ["timestamp", "type", "data"])
 
@@ -45,6 +49,45 @@ def load_standard_notes() -> List[str]:
     return notes
 
 
+def load_evernote() -> List[str]:
+    notes = []
+    d = Path("./data/private/Evernote")
+    dateset = set()
+    for p in d.glob("*.md"):
+        data = p.read_text()
+
+        if False:
+            authors = re_evernote_author.findall(data)
+            if authors and "erik" not in authors[0]:
+                print(f" - Skipped note from other author: {authors}")
+                continue
+
+            source = re_evernote_source.findall(data)
+            if not authors and not source:
+                print(f" - Skipping note without author or source")
+                continue
+
+            if source and "android" not in source[0]:
+                print(f" - Source was something else than android: {source}")
+
+        dates = re_date.findall(str(p))
+        if dates:
+            dateset.add(dates[0])
+            notes.append(data)
+    # pprint(sorted(dates))
+    return notes
+
+
+substance_map = {
+    'nicotinamide': 'Niacinamide',
+    'mg': 'Magnesium',
+    'mg cit': 'Magnesium citrate',
+    'mg citrate': 'Magnesium citrate',
+    'magnesium citrate': 'Magnesium citrate',
+    'zinc': 'Zinc',
+}
+
+
 def parse_data(data: str) -> List[Dict[str, Any]]:
     datas = []
     if re_amount.match(data):
@@ -66,19 +109,30 @@ def parse_data(data: str) -> List[Dict[str, Any]]:
                 d["extra"] = m_extra[0].strip("()")
                 entry = entry.replace("(" + d["extra"] + ")", "").strip()
 
-            d["substance"] = entry
+            d["substance"] = entry.strip("\\").strip()
+            if d["substance"].lower() in substance_map:
+                d["substance"] = substance_map[d["substance"].lower()]
             datas.append(d)
     return datas
 
 
 def parse_time(s: str) -> Tuple[time, List[str]]:
     tags = []
+    s = s.split(" ")[0]
     if "+" in s:
         tags.append("time-tomorrow")
     if "~" in s:
         tags.append("time-approximate")
     s = s.strip("+~").strip("+").strip("~")
-    t = datetime.strptime(s, "%H:%M").time()
+    # Remove extra +01:00
+    s = s.split("+")[0]
+    # Remove eventual second precision
+    s = ":".join(s.split(":")[:2])
+    try:
+        t = datetime.strptime(s, "%H:%M").time()
+    except ValueError as e:
+        print(f"Tried to parse time: {s}")
+        raise e
     return t, tags
 
 
@@ -98,7 +152,10 @@ def parse(text: str) -> List[Event]:
                 if not current_date:
                     log.warning("Date unknown, skipping")
                     continue
-                t, tags = parse_time(line.split("-")[0].strip())
+                try:
+                    t, tags = parse_time(line.split("-")[0].strip())
+                except ValueError:
+                    continue
                 timestamp = datetime.combine(current_date.date(), t)
                 data = "-".join(line.split("-")[1:]).strip()
                 if re_amount.match(data):
@@ -246,7 +303,7 @@ def _annotate_doses(events: List[Event]) -> List[Event]:
     return events
 
 
-def _print_daily_doses(events: List[Event], substance: str):
+def _print_daily_doses(events: List[Event], substance: str, ignore_doses_fewer_than=None):
     events = [e for e in events if isinstance(e.data, dict) and e.data["substance"] == substance]
     events = _annotate_doses(events)
     if not events:
@@ -261,8 +318,21 @@ def _print_daily_doses(events: List[Event], substance: str):
             amt = reduce(lambda amt, e2: amt + e2.data["dose"], v, Dose(substance, f"0{unit}"))
             tot_amt += amt
         except Exception as e:
-            log.warning(f"Unable to parse amount: {e}")
-    print(f"{len(grouped_by_date)} days totalling {tot_amt}, avg dose/day: {_fmt_amount(tot_amt.amount/len(events), unit)}")
+            log.warning(f"Unable to parse amount '{v}': {e}")
+
+    if ignore_doses_fewer_than and ignore_doses_fewer_than > len(grouped_by_date):
+        return
+    print(f"{substance}:\n - {len(grouped_by_date)} days totalling {tot_amt}\n - avg dose/day: {_fmt_amount(tot_amt.amount/len(events), unit)}")
+
+
+def _print_substancelist(events):
+    events = [e for e in events if isinstance(e.data, dict)]
+    events = _annotate_doses(events)
+    substances = {e.data["substance"] for e in events}
+    for substance in sorted(substances):
+        _print_daily_doses(events, substance, ignore_doses_fewer_than=2)
+
+
 
 
 def _print_usage():
@@ -272,10 +342,16 @@ def _print_usage():
     print(" - doses <substance>")
 
 
-if __name__ == "__main__":
+def test_evernote():
+    load_evernote()
+
+
+def main():
     logging.basicConfig()
 
-    notes = load_standard_notes()
+    notes = []
+    notes += load_standard_notes()
+    notes += load_evernote()
 
     events = [e for note in notes for e in parse(note)]
 
@@ -288,7 +364,13 @@ if __name__ == "__main__":
                 print("Missing argument")
             else:
                 _print_daily_doses(events, sys.argv[2])
+        elif sys.argv[1] == "substances":
+            _print_substancelist(events)
         else:
             _print_usage()
     else:
         _print_usage()
+
+
+if __name__ == "__main__":
+    main()
