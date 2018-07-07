@@ -10,12 +10,12 @@ Usage
 
 This repo contains tools to import from:
 
- - Standard Notes export
- - ~~Evernote Export~~ (not yet)
+ - Standard Notes
+ - Evernote
 
 For Standard Notes, create an unencrypted export and unzip the `SN Archive.txt` file into `./data/private` (keep its default name). 
 
-(NOT SUPPORTED YET) For Evernote, export the notebooks you want to analyze as `.enex` file. Then put all the exported notebooks you want into `./data/private`.
+For Evernote, export the notebooks you want to analyze as `.enex` file. Then put all the exported notebooks you want into `./data/private`. Then run `make data/private/Evernote` to extract the .enex into markdown files (which will be put into `data/private/Evernote/`).
 
 Then simply run `./main.py` to get further usage instructions.
 

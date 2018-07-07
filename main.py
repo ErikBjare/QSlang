@@ -4,6 +4,7 @@ import sys
 import re
 import logging
 import json
+import statistics
 from typing import List, Dict, Any, Tuple, Union
 from copy import copy
 from collections import namedtuple
@@ -320,9 +321,17 @@ def _print_daily_doses(events: List[Event], substance: str, ignore_doses_fewer_t
         except Exception as e:
             log.warning(f"Unable to parse amount '{v}': {e}")
 
+    median_dose = statistics.median(e.data["dose"].amount for e in events)
+    min_dose = min(e.data["dose"].amount for e in events)
+    max_dose = max(e.data["dose"].amount for e in events)
+
     if ignore_doses_fewer_than and ignore_doses_fewer_than > len(grouped_by_date):
         return
-    print(f"{substance}:\n - {len(grouped_by_date)} days totalling {tot_amt}\n - avg dose/day: {_fmt_amount(tot_amt.amount/len(events), unit)}")
+
+    print(f"{substance}:")
+    print(f" - {len(grouped_by_date)} days totalling {tot_amt}")
+    print(f" - avg dose/day: {_fmt_amount(tot_amt.amount/len(events), unit)}")
+    print(f" - min/median/max dose: {_fmt_amount(min_dose, unit)}/{_fmt_amount(median_dose, unit)}/{_fmt_amount(max_dose, unit)}")
 
 
 def _print_substancelist(events):
@@ -361,7 +370,8 @@ def main():
             if len(sys.argv) < 3:
                 print("Missing argument")
             else:
-                _print_daily_doses(events, sys.argv[2])
+                for substance in sys.argv[2:]:
+                    _print_daily_doses(events, substance)
         elif sys.argv[1] == "substances":
             _print_substancelist(events)
         else:
