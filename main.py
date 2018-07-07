@@ -356,13 +356,13 @@ def test_evernote():
 def main():
     logging.basicConfig()
 
-    notes = []
-    notes += load_standard_notes()
-    notes += load_evernote()
-
-    events = [e for note in notes for e in parse(note)]
-
     if sys.argv[1:]:
+        notes = []
+        notes += load_standard_notes()
+        notes += load_evernote()
+
+        events = [e for note in notes for e in parse(note)]
+
         if sys.argv[1] == "events":
             for e in events:
                 print(e)
