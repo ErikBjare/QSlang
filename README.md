@@ -19,8 +19,10 @@ For Evernote, export the notebooks you want to analyze as `.enex` file. Then put
 
 Then simply run `./main.py` to get further usage instructions.
 
-Format
-======
+Input format
+============
+
+This is the expected format of notes, I've tried to make it lenient/flexible parser but might write a stricter one in the future to avoid ambiguous parsing.
 
 Basic example:
 
