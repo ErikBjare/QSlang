@@ -84,8 +84,8 @@ substance_map = {
     'mg': 'Magnesium',
     'mg cit': 'Magnesium citrate',
     'mg citrate': 'Magnesium citrate',
-    'magnesium citrate': 'Magnesium citrate',
     'zinc': 'Zinc',
+    'creatine monohydrate': 'Creatine monohydrate',
 }
 
 
@@ -305,7 +305,7 @@ def _annotate_doses(events: List[Event]) -> List[Event]:
 
 
 def _print_daily_doses(events: List[Event], substance: str, ignore_doses_fewer_than=None):
-    events = [e for e in events if isinstance(e.data, dict) and e.data["substance"] == substance]
+    events = [e for e in events if isinstance(e.data, dict) and e.data["substance"].lower() == substance.lower()]
     events = _annotate_doses(events)
     if not events:
         print(f"No doses found for substance '{substance}'")
@@ -321,17 +321,28 @@ def _print_daily_doses(events: List[Event], substance: str, ignore_doses_fewer_t
         except Exception as e:
             log.warning(f"Unable to parse amount '{v}': {e}")
 
-    median_dose = statistics.median(e.data["dose"].amount for e in events)
-    min_dose = min(e.data["dose"].amount for e in events)
-    max_dose = max(e.data["dose"].amount for e in events)
+    median_dose = statistics.median(e.data["dose"].amount for e in events if "dose" in e.data)
+    min_dose = min(e.data["dose"].amount for e in events if "dose" in e.data)
+    max_dose = max(e.data["dose"].amount for e in events if "dose" in e.data)
 
     if ignore_doses_fewer_than and ignore_doses_fewer_than > len(grouped_by_date):
         return
 
+    def _roa_key(e):
+        return e.data["roa"] if "roa" in e.data else "unknown"
+
+    # TODO: Use Counter
+
     print(f"{substance}:")
-    print(f" - {len(grouped_by_date)} days totalling {tot_amt}")
+    print(f" - latest: {max(grouped_by_date)} ({(date.today() - max(grouped_by_date)).days} days ago)")
+    print(f" - oldest: {min(grouped_by_date)} ({(date.today() - min(grouped_by_date)).days} days ago)")
+    print(f" - {len(grouped_by_date)} days totalling {tot_amt.amount_with_unit}")
     print(f" - avg dose/day: {_fmt_amount(tot_amt.amount/len(events), unit)}")
     print(f" - min/median/max dose: {_fmt_amount(min_dose, unit)}/{_fmt_amount(median_dose, unit)}/{_fmt_amount(max_dose, unit)}")
+    grouped_by_roa = {k: list(v) for k, v in groupby(sorted(events, key=_roa_key), key=_roa_key)}
+    print(f" - ROAs:")
+    for roa in sorted(grouped_by_roa, key=lambda v: grouped_by_roa[v]):
+        print(f"   - {roa.ljust(10)}  n: {len(grouped_by_roa[roa])}")
 
 
 def _print_substancelist(events):
@@ -353,8 +364,30 @@ def test_evernote():
     load_evernote()
 
 
+class MsgCounterHandler(logging.Handler):
+    """https://stackoverflow.com/a/31142078/965332"""
+    level2count = None
+
+    def __init__(self, *args, **kwargs):
+        super(MsgCounterHandler, self).__init__(*args, **kwargs)
+        self.level2count = {}
+
+    def emit(self, record):
+        levelname = record.levelname
+        if levelname not in self.level2count:
+            self.level2count[levelname] = 0
+        self.level2count[levelname] += 1
+
+
 def main():
-    logging.basicConfig()
+    msgcounter = MsgCounterHandler()
+
+    verbose = "-v" in sys.argv
+    if verbose:
+        sys.argv.remove("-v")
+    logging.basicConfig(level=logging.DEBUG if verbose else logging.ERROR)
+
+    logging.getLogger().addHandler(msgcounter)
 
     if sys.argv[1:]:
         notes = []
@@ -378,6 +411,9 @@ def main():
             _print_usage()
     else:
         _print_usage()
+
+    if msgcounter.level2count:
+        print(f'Messages logged: {msgcounter.level2count}')
 
 
 if __name__ == "__main__":
