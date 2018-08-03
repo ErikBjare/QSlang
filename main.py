@@ -7,7 +7,7 @@ import json
 import statistics
 from typing import List, Dict, Any, Tuple, Union
 from copy import copy
-from collections import namedtuple
+from collections import namedtuple, Counter
 from datetime import date, time, datetime
 from pathlib import Path
 from itertools import groupby
@@ -27,7 +27,7 @@ re_evernote_source = re.compile(r'>source:(.+)$')
 Event = namedtuple("Event", ["timestamp", "type", "data"])
 
 
-def load_standard_notes() -> List[str]:
+def _load_standard_notes() -> List[str]:
     notes = []
     p = Path("./data/private")
     for path in p.glob("*Archive*.txt"):
@@ -49,7 +49,7 @@ def load_standard_notes() -> List[str]:
     return notes
 
 
-def load_evernote() -> List[str]:
+def _load_evernote() -> List[str]:
     notes = []
     d = Path("./data/private/Evernote")
     dateset = set()
@@ -79,14 +79,25 @@ def load_evernote() -> List[str]:
     return notes
 
 
-substance_map = {
-    'nicotinamide': 'Niacinamide',
-    'mg': 'Magnesium',
-    'mg cit': 'Magnesium citrate',
-    'mg citrate': 'Magnesium citrate',
-    'zinc': 'Zinc',
-    'creatine monohydrate': 'Creatine monohydrate',
-}
+def load_events():
+    notes = []
+    notes += _load_standard_notes()
+    notes += _load_evernote()
+
+    events = [e for note in notes for e in parse(note)]
+    return events
+
+
+def _load_substance_map():
+    p = Path("data/substance_map.csv")
+    if p.is_file():
+        with p.open() as f:
+            return dict(line.split(",") for line in f.readlines())
+    else:
+        return {}
+
+
+substance_map = _load_substance_map()
 
 
 def parse_data(data: str) -> List[Dict[str, Any]]:
@@ -138,6 +149,7 @@ def parse_time(s: str) -> Tuple[time, List[str]]:
 
 
 def parse(text: str) -> List[Event]:
+    now = datetime.now()
     events = []  # type: List[Event]
 
     current_date = None
@@ -153,11 +165,17 @@ def parse(text: str) -> List[Event]:
                 if not current_date:
                     log.warning("Date unknown, skipping")
                     continue
+
                 try:
                     t, tags = parse_time(line.split("-")[0].strip())
                 except ValueError:
                     continue
                 timestamp = datetime.combine(current_date.date(), t)
+
+                # Check if timestamp is in future (likely result of date in the future)
+                if timestamp > now:
+                    log.warning("Timestamp was in the future")
+
                 data = "-".join(line.split("-")[1:]).strip()
                 if re_amount.match(data):
                     # Data entry
@@ -361,7 +379,7 @@ def _print_usage():
 
 
 def test_evernote():
-    load_evernote()
+    _load_evernote()
 
 
 class MsgCounterHandler(logging.Handler):
@@ -379,6 +397,27 @@ class MsgCounterHandler(logging.Handler):
         self.level2count[levelname] += 1
 
 
+def _plot_frequency(events):
+    """
+    Should plot frequency of use over time
+    (i.e. a barchart where the bar heights are equal to the count per period)
+    """
+    events = list(sorted(events, key=lambda e: e.timestamp))
+    by_month = groupby(events, key=lambda e: (e.timestamp.year, e.timestamp.month))
+    for month, grouped_events in by_month:
+        grouped_events = list(grouped_events)
+
+        def _substance(e: Event):
+            if isinstance(e.data, dict):
+                return e.data["substance"].strip()
+            else:
+                return "unknown/journal"
+        print(month, len(list([e.data for e in grouped_events])))
+        most_common = Counter({substance: len(list(events)) for substance, events in groupby(sorted(grouped_events, key=_substance), key=_substance)})
+        for k, v in most_common.most_common(10):
+            print(f" - {v}x {k}")
+
+
 def main():
     msgcounter = MsgCounterHandler()
 
@@ -389,12 +428,9 @@ def main():
 
     logging.getLogger().addHandler(msgcounter)
 
-    if sys.argv[1:]:
-        notes = []
-        notes += load_standard_notes()
-        notes += load_evernote()
+    events = load_events()
 
-        events = [e for note in notes for e in parse(note)]
+    if sys.argv[1:]:
 
         if sys.argv[1] == "events":
             for e in events:
@@ -407,6 +443,8 @@ def main():
                     _print_daily_doses(events, substance)
         elif sys.argv[1] == "substances":
             _print_substancelist(events)
+        elif sys.argv[1] == "plot":
+            _plot_frequency(events)
         else:
             _print_usage()
     else:
