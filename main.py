@@ -5,13 +5,16 @@ import re
 import logging
 import json
 import statistics
+import itertools
 from typing import List, Dict, Any, Tuple, Union
 from copy import copy
-from collections import namedtuple, Counter
+from collections import namedtuple, Counter, defaultdict
 from datetime import date, time, datetime
 from pathlib import Path
 from itertools import groupby
 from functools import reduce
+
+from dataclasses import dataclass, field
 
 log = logging.getLogger(__name__)
 
@@ -24,7 +27,12 @@ re_roa = re.compile(r"(orall?y?|buccal|subcut|smoked|vaporized|insuffl?a?t?e?d?|
 re_evernote_author = re.compile(r'>author:(.+)$')
 re_evernote_source = re.compile(r'>source:(.+)$')
 
-Event = namedtuple("Event", ["timestamp", "type", "data"])
+
+@dataclass(order=True)
+class Event:
+    timestamp: datetime
+    type: str
+    data: dict = field(compare=False)
 
 
 def _load_standard_notes() -> List[str]:
@@ -121,7 +129,7 @@ def parse_data(data: str) -> List[Dict[str, Any]]:
                 d["extra"] = m_extra[0].strip("()")
                 entry = entry.replace("(" + d["extra"] + ")", "").strip()
 
-            d["substance"] = entry.strip("\\").strip()
+            d["substance"] = entry.strip("\\").strip().strip(")")
             if d["substance"].lower() in substance_map:
                 d["substance"] = substance_map[d["substance"].lower()]
             datas.append(d)
@@ -330,7 +338,7 @@ def _print_daily_doses(events: List[Event], substance: str, ignore_doses_fewer_t
         return
     unit = events[0].data["dose"].unit
 
-    grouped_by_date = {k: list(v) for k, v in groupby(sorted(events, key=lambda e: e.timestamp.date()), key=lambda e: e.timestamp.date())}
+    grouped_by_date = {k: list(v) for k, v in groupby(sorted(events), key=lambda e: e.timestamp.date())}
     tot_amt = Dose(substance, f"0{unit}")
     for _, v in grouped_by_date.items():
         try:
@@ -375,7 +383,8 @@ def _print_usage():
     print("Usage: python3 main.py <subcommand>")
     print("Subcommands:")
     print(" - events")
-    print(" - doses <substance>")
+    print(" - doses <substances>")
+    print(" - plot <substances>")
 
 
 def test_evernote():
@@ -397,25 +406,67 @@ class MsgCounterHandler(logging.Handler):
         self.level2count[levelname] += 1
 
 
-def _plot_frequency(events):
+def _substance(e: Event):
+    # TODO: Turn into a helper method on Event?
+    if isinstance(e.data, dict):
+        return e.data["substance"].strip()
+    else:
+        return "unknown/journal"
+
+
+def _plot_frequency(events, count=True):
     """
     Should plot frequency of use over time
     (i.e. a barchart where the bar heights are equal to the count per period)
     """
-    events = list(sorted(events, key=lambda e: e.timestamp))
-    by_month = groupby(events, key=lambda e: (e.timestamp.year, e.timestamp.month))
-    for month, grouped_events in by_month:
-        grouped_events = list(grouped_events)
+    import matplotlib.pyplot as plt
+    import numpy as np
 
-        def _substance(e: Event):
-            if isinstance(e.data, dict):
-                return e.data["substance"].strip()
-            else:
-                return "unknown/journal"
-        print(month, len(list([e.data for e in grouped_events])))
-        most_common = Counter({substance: len(list(events)) for substance, events in groupby(sorted(grouped_events, key=_substance), key=_substance)})
-        for k, v in most_common.most_common(10):
-            print(f" - {v}x {k}")
+    events = list(sorted(events))
+    by_period = groupby(events, key=lambda e: (e.timestamp.year, e.timestamp.month))
+    period_counts = defaultdict(list)
+    labels = []
+    substances = {_substance(e) for e in events}
+
+    grouped_by_date = defaultdict(list)
+    for period, events in by_period:
+        grouped_by_date[period] = list(events)
+        labels.append("-".join(map(str, period)))
+
+    def _fill_blank_dates(labels):
+        (min_year, min_month) = map(int, min(labels).split("-"))
+        (max_year, max_month) = map(int, max(labels).split("-"))
+        g = itertools.product(range(min_year, max_year + 1), range(1, 13))
+        g = itertools.dropwhile(lambda t: t < (min_year, min_month), g)
+        return list(itertools.takewhile(lambda t: t <= (max_year, max_month), g))
+
+    labels = ["-".join(map(str, t)) for t in _fill_blank_dates(labels)]
+    for period in _fill_blank_dates(labels):
+        events = grouped_by_date[period]
+        grouped_by_substance = groupby(sorted(events, key=_substance), key=_substance)
+        if count:
+            c = Counter({substance: len(list(events)) for substance, events in grouped_by_substance})
+            unit = "x"
+        else:
+            events = _annotate_doses(events)
+            c = Counter({substance: sum(e.data["dose"].amount for e in events) for substance, events in grouped})
+            unit = events[0].data["dose"].unit
+
+        print(period)
+        for k, v in c.most_common(10):
+            print(f" - {v}{unit} {k}")
+
+        for s in sorted(substances):
+            period_counts[s].append(c[s])
+
+    stackheight = np.zeros(len(labels))
+    for substance, n in period_counts.items():
+        plt.bar(labels, n, label=substance, bottom=stackheight)
+        stackheight += np.array(n)
+
+    plt.xticks(labels, rotation='vertical')
+    plt.legend()
+    plt.show()
 
 
 def main():
@@ -444,6 +495,9 @@ def main():
         elif sys.argv[1] == "substances":
             _print_substancelist(events)
         elif sys.argv[1] == "plot":
+            substances = sys.argv[2:]
+            if substances:
+                events = [e for e in events if _substance(e) in substances]
             _plot_frequency(events)
         else:
             _print_usage()
