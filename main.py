@@ -15,6 +15,9 @@ from itertools import groupby
 from functools import reduce
 
 from dataclasses import dataclass, field
+import matplotlib.pyplot as plt
+import numpy as np
+
 
 log = logging.getLogger(__name__)
 
@@ -414,34 +417,32 @@ def _substance(e: Event):
         return "unknown/journal"
 
 
-def _plot_frequency(events, count=True):
+def _plot_frequency(events, count=False):
     """
     Should plot frequency of use over time
     (i.e. a barchart where the bar heights are equal to the count per period)
     """
-    import matplotlib.pyplot as plt
-    import numpy as np
+    # Filter away journal entries and sort
+    events = list(sorted(filter(lambda e: e.type == "data", events)))
 
-    events = list(sorted(events))
-    by_period = groupby(events, key=lambda e: (e.timestamp.year, e.timestamp.month))
-    period_counts = defaultdict(list)
     labels = []
     substances = {_substance(e) for e in events}
 
     grouped_by_date = defaultdict(list)
-    for period, events in by_period:
-        grouped_by_date[period] = list(events)
-        labels.append("-".join(map(str, period)))
+    for period, events_grouped in groupby(events, key=lambda e: (e.timestamp.year, e.timestamp.month)):
+        grouped_by_date[period] = list(events_grouped)
+        labels.append(period)
 
-    def _fill_blank_dates(labels):
-        (min_year, min_month) = map(int, min(labels).split("-"))
-        (max_year, max_month) = map(int, max(labels).split("-"))
+    def _fill_blank_dates(labels_tuples):
+        (min_year, min_month) = min(labels_tuples)
+        (max_year, max_month) = max(labels_tuples)
         g = itertools.product(range(min_year, max_year + 1), range(1, 13))
         g = itertools.dropwhile(lambda t: t < (min_year, min_month), g)
         return list(itertools.takewhile(lambda t: t <= (max_year, max_month), g))
 
-    labels = ["-".join(map(str, t)) for t in _fill_blank_dates(labels)]
-    for period in _fill_blank_dates(labels):
+    period_counts = defaultdict(list)
+    labels = _fill_blank_dates(labels)
+    for period in labels:
         events = grouped_by_date[period]
         grouped_by_substance = groupby(sorted(events, key=_substance), key=_substance)
         if count:
@@ -449,11 +450,11 @@ def _plot_frequency(events, count=True):
             unit = "x"
         else:
             events = _annotate_doses(events)
-            c = Counter({substance: sum(e.data["dose"].amount for e in events) for substance, events in grouped})
-            unit = events[0].data["dose"].unit
+            c = Counter({substance: sum(e.data["dose"].amount for e in events if "dose" in e.data) for substance, events in grouped_by_substance})
+            unit = events[0].data["dose"].unit if events and "dose" in events[0].data else ""
 
         print(period)
-        for k, v in c.most_common(10):
+        for k, v in c.most_common(20):
             print(f" - {v}{unit} {k}")
 
         for s in sorted(substances):
@@ -461,10 +462,10 @@ def _plot_frequency(events, count=True):
 
     stackheight = np.zeros(len(labels))
     for substance, n in period_counts.items():
-        plt.bar(labels, n, label=substance, bottom=stackheight)
+        plt.bar(["-".join(map(str, t)) for t in labels], n, label=substance, bottom=stackheight)
         stackheight += np.array(n)
 
-    plt.xticks(labels, rotation='vertical')
+    plt.xticks(rotation='vertical')
     plt.legend()
     plt.show()
 
