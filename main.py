@@ -103,7 +103,8 @@ def _load_substance_map():
     p = Path("data/substance_map.csv")
     if p.is_file():
         with p.open() as f:
-            return dict(line.split(",") for line in f.readlines())
+            lines = f.readlines()
+            return dict((line.split(",")[0].lower(), line.split(",")[1]) for line in lines)
     else:
         return {}
 
@@ -417,11 +418,12 @@ def _substance(e: Event):
         return "unknown/journal"
 
 
-def _plot_frequency(events, count=False):
+def _plot_frequency(events, count=True, count_by_date=True):
     """
     Should plot frequency of use over time
     (i.e. a barchart where the bar heights are equal to the count per period)
     """
+
     # Filter away journal entries and sort
     events = list(sorted(filter(lambda e: e.type == "data", events)))
 
@@ -446,7 +448,13 @@ def _plot_frequency(events, count=False):
         events = grouped_by_date[period]
         grouped_by_substance = groupby(sorted(events, key=_substance), key=_substance)
         if count:
-            c = Counter({substance: len(list(events)) for substance, events in grouped_by_substance})
+            events_by_substance = {substance: list(events) for substance, events in grouped_by_substance}
+            if count_by_date:
+                test = [{substance: {e.timestamp.date() for e in events} for substance, events in events_by_substance.items()}]
+                print(test)
+                c = Counter({substance: len({e.timestamp.date() for e in events}) for substance, events in events_by_substance.items()})
+            else:
+                c = Counter({substance: len(events) for substance, events in events_by_substance.items()})
             unit = "x"
         else:
             events = _annotate_doses(events)
