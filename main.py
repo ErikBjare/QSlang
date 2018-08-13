@@ -6,7 +6,7 @@ import logging
 import json
 import statistics
 import itertools
-from typing import List, Dict, Any, Tuple, Union
+from typing import List, Dict, Any, Tuple, Union, Optional
 from copy import copy
 from collections import namedtuple, Counter, defaultdict
 from datetime import date, time, datetime
@@ -36,6 +36,25 @@ class Event:
     timestamp: datetime
     type: str
     data: dict = field(compare=False)
+
+    @property
+    def tags(self) -> List[str]:
+        return self.data["tags"] if "tags" in self.data else []
+
+    @property
+    def substance(self) -> Optional[str]:
+        if isinstance(self.data, dict):
+            return self.data["substance"].strip() if "substance" in self.data else None
+        else:
+            return "unknown/journal"
+
+    @property
+    def unit(self):
+        return self.data["unit"] if "unit" in self.data else None
+
+    @property
+    def roa(self):
+        return self.data["roa"] if "roa" in self.data else "unknown"
 
 
 def _load_standard_notes() -> List[str]:
@@ -95,8 +114,24 @@ def load_events():
     notes += _load_standard_notes()
     notes += _load_evernote()
 
-    events = [e for note in notes for e in parse(note)]
+    events = sorted([e for note in notes for e in parse(note)])
+    events = _annotate_doses(events)
+    events = _tag_substances(events)
     return events
+
+
+def _load_substance_categories():
+    # TODO: Support more than one category per substance
+    p = Path("data/substance_categories.csv")
+    if p.is_file():
+        with p.open() as f:
+            lines = f.readlines()
+            return dict((line.split(",")[0].lower(), [line.split(",")[1].strip()]) for line in lines)
+    else:
+        return {}
+
+
+substance_categories = _load_substance_categories()
 
 
 def _load_substance_map():
@@ -104,7 +139,7 @@ def _load_substance_map():
     if p.is_file():
         with p.open() as f:
             lines = f.readlines()
-            return dict((line.split(",")[0].lower(), line.split(",")[1]) for line in lines)
+            return dict((line.split(",")[0].lower(), line.split(",")[1].strip()) for line in lines)
     else:
         return {}
 
@@ -203,11 +238,14 @@ def parse(text: str) -> List[Event]:
 
 
 def print_event(e: Event) -> None:
-    d = e.data
-    if e.type == "data":
-        e_str = f"{d['amount'] if 'amount' in d else '?'} {d['substance']}"
+    if e.type == "data" and 'amount' in e.data and 'substance' in e.data:
+        d = e.data
+        misc = copy(e.data)
+        misc.pop('amount')
+        misc.pop('substance')
+        e_str = f"{d['amount'] if 'amount' in d else '?'} {d['substance']}  -  {misc}"
     else:
-        e_str = e.data
+        e_str = str(e.data)
     print(f"{e.timestamp.isoformat()} | {e.type.ljust(7)} | " + e_str)
 
 
@@ -324,10 +362,20 @@ def test_sum_amount():
     assert _sum_amount("33cl", "1l") == "1.33l"
 
 
+def _tag_substances(events: List[Event]) -> List[Event]:
+    for e in events:
+        if e.substance.lower() in substance_categories:
+            cats = substance_categories[e.substance.lower()]
+            e.data["tags"] = cats
+    n_categorized = len([e for e in events if e.tags])
+    print(f"Categorized {n_categorized} out {len(events)} of events ({round(n_categorized/len(events)*100, 1)}%)")
+    return events
+
+
 def _annotate_doses(events: List[Event]) -> List[Event]:
     for e in events:
         try:
-            e.data["dose"] = Dose(e.data["substance"], e.data["amount"])
+            e.data["dose"] = Dose(e.substance, e.data["amount"])
         except Exception as exc:
             log.warning(f"Unable to annotate dose: {exc}")
             events.remove(e)
@@ -335,14 +383,15 @@ def _annotate_doses(events: List[Event]) -> List[Event]:
 
 
 def _print_daily_doses(events: List[Event], substance: str, ignore_doses_fewer_than=None):
-    events = [e for e in events if isinstance(e.data, dict) and e.data["substance"].lower() == substance.lower()]
-    events = _annotate_doses(events)
+    events = [e for e in events if isinstance(e.data, dict)]
+    events = [e for e in events if e.data["substance"].lower() == substance.lower()]
     if not events:
         print(f"No doses found for substance '{substance}'")
         return
-    unit = events[0].data["dose"].unit
 
-    grouped_by_date = {k: list(v) for k, v in groupby(sorted(events), key=lambda e: e.timestamp.date())}
+    unit = set(map(_unit, events)).pop()
+
+    grouped_by_date = igroupby(sorted(events), key=lambda e: e.timestamp.date())
     tot_amt = Dose(substance, f"0{unit}")
     for _, v in grouped_by_date.items():
         try:
@@ -358,9 +407,6 @@ def _print_daily_doses(events: List[Event], substance: str, ignore_doses_fewer_t
     if ignore_doses_fewer_than and ignore_doses_fewer_than > len(grouped_by_date):
         return
 
-    def _roa_key(e):
-        return e.data["roa"] if "roa" in e.data else "unknown"
-
     # TODO: Use Counter
 
     print(f"{substance}:")
@@ -369,7 +415,7 @@ def _print_daily_doses(events: List[Event], substance: str, ignore_doses_fewer_t
     print(f" - {len(grouped_by_date)} days totalling {tot_amt.amount_with_unit}")
     print(f" - avg dose/day: {_fmt_amount(tot_amt.amount/len(events), unit)}")
     print(f" - min/median/max dose: {_fmt_amount(min_dose, unit)}/{_fmt_amount(median_dose, unit)}/{_fmt_amount(max_dose, unit)}")
-    grouped_by_roa = {k: list(v) for k, v in groupby(sorted(events, key=_roa_key), key=_roa_key)}
+    grouped_by_roa = igroupby(events, key=lambda e: e.roa)
     print(f" - ROAs:")
     for roa in sorted(grouped_by_roa, key=lambda v: grouped_by_roa[v]):
         print(f"   - {roa.ljust(10)}  n: {len(grouped_by_roa[roa])}")
@@ -377,8 +423,7 @@ def _print_daily_doses(events: List[Event], substance: str, ignore_doses_fewer_t
 
 def _print_substancelist(events):
     events = [e for e in events if isinstance(e.data, dict)]
-    events = _annotate_doses(events)
-    substances = {e.data["substance"] for e in events}
+    substances = {e.substance for e in events}
     for substance in sorted(substances):
         _print_daily_doses(events, substance, ignore_doses_fewer_than=2)
 
@@ -410,12 +455,8 @@ class MsgCounterHandler(logging.Handler):
         self.level2count[levelname] += 1
 
 
-def _substance(e: Event):
-    # TODO: Turn into a helper method on Event?
-    if isinstance(e.data, dict):
-        return e.data["substance"].strip()
-    else:
-        return "unknown/journal"
+def igroupby(l, key=lambda x: x):
+    return {k: list(v) for k, v in groupby(sorted(l, key=key), key=key)}
 
 
 def _plot_frequency(events, count=True, count_by_date=True):
@@ -428,7 +469,7 @@ def _plot_frequency(events, count=True, count_by_date=True):
     events = list(sorted(filter(lambda e: e.type == "data", events)))
 
     labels = []
-    substances = {_substance(e) for e in events}
+    substances = {e.substance for e in events}
 
     grouped_by_date = defaultdict(list)
     for period, events_grouped in groupby(events, key=lambda e: (e.timestamp.year, e.timestamp.month)):
@@ -446,19 +487,15 @@ def _plot_frequency(events, count=True, count_by_date=True):
     labels = _fill_blank_dates(labels)
     for period in labels:
         events = grouped_by_date[period]
-        grouped_by_substance = groupby(sorted(events, key=_substance), key=_substance)
+        grouped_by_substance = igroupby(events, key=lambda e: e.substance)
         if count:
-            events_by_substance = {substance: list(events) for substance, events in grouped_by_substance}
             if count_by_date:
-                test = [{substance: {e.timestamp.date() for e in events} for substance, events in events_by_substance.items()}]
-                print(test)
-                c = Counter({substance: len({e.timestamp.date() for e in events}) for substance, events in events_by_substance.items()})
+                c = Counter({substance: len({e.timestamp.date() for e in events}) for substance, events in grouped_by_substance.items()})
             else:
-                c = Counter({substance: len(events) for substance, events in events_by_substance.items()})
+                c = Counter({substance: len(events) for substance, events in grouped_by_substance.items()})
             unit = "x"
         else:
-            events = _annotate_doses(events)
-            c = Counter({substance: sum(e.data["dose"].amount for e in events if "dose" in e.data) for substance, events in grouped_by_substance})
+            c = Counter({substance: sum(e.data["dose"].amount for e in events if "dose" in e.data) for substance, events in grouped_by_substance.items()})
             unit = events[0].data["dose"].unit if events and "dose" in events[0].data else ""
 
         print(period)
@@ -493,8 +530,7 @@ def main():
     if sys.argv[1:]:
 
         if sys.argv[1] == "events":
-            for e in events:
-                print(e)
+            print_events(events)
         elif sys.argv[1] == "doses":
             if len(sys.argv) < 3:
                 print("Missing argument")
@@ -506,7 +542,9 @@ def main():
         elif sys.argv[1] == "plot":
             substances = sys.argv[2:]
             if substances:
-                events = [e for e in events if _substance(e) in substances]
+                events = [e for e in events
+                        if e.substance in substances
+                        or set(substances).intersection(set(e.tags))]
             _plot_frequency(events)
         else:
             _print_usage()
