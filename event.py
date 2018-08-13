@@ -7,6 +7,8 @@ from datetime import datetime
 
 from dataclasses import dataclass, field
 
+from dose import Dose
+
 
 log = logging.getLogger(__name__)
 
@@ -29,8 +31,19 @@ class Event:
             return "unknown/journal"
 
     @property
+    def dose(self) -> Optional[Dose]:
+        if self.substance and "amount" in self.data:
+            try:
+                return Dose(self.substance, self.data["amount"])
+            except Exception as e:
+                log.warning(f"Unable to build Dose object: {e}")
+                return None
+        else:
+            return None
+
+    @property
     def unit(self):
-        return self.data["unit"] if "unit" in self.data else None
+        return self.dose.unit if self.dose else None
 
     @property
     def roa(self):

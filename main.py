@@ -40,26 +40,25 @@ def print_events(events: List[Event]) -> None:
 
 
 def _print_daily_doses(events: List[Event], substance: str, ignore_doses_fewer_than=None):
-    events = [e for e in events if isinstance(e.data, dict)]
-    events = [e for e in events if e.data["substance"].lower() == substance.lower()]
+    events = [e for e in events if e.substance and e.substance.lower() == substance.lower()]
     if not events:
         print(f"No doses found for substance '{substance}'")
         return
 
-    unit = set(map(lambda e: e.unit, events)).pop()
+    unit = next(map(lambda e: e.unit, events))
 
     grouped_by_date = igroupby(sorted(events), key=lambda e: e.timestamp.date())
     tot_amt = Dose(substance, f"0{unit}")
     for _, v in grouped_by_date.items():
         try:
-            amt = reduce(lambda amt, e2: amt + e2.data["dose"], v, Dose(substance, f"0{unit}"))
+            amt = reduce(lambda amt, e2: amt + e2.dose, v, Dose(substance, f"0{unit}"))
             tot_amt += amt
         except Exception as e:
             log.warning(f"Unable to parse amount '{v}': {e}")
 
-    median_dose = statistics.median(e.data["dose"].amount for e in events if "dose" in e.data)
-    min_dose = min(e.data["dose"].amount for e in events if "dose" in e.data)
-    max_dose = max(e.data["dose"].amount for e in events if "dose" in e.data)
+    median_dose = statistics.median(e.dose.amount for e in events if e.dose)
+    min_dose = min(e.dose.amount for e in events if e.dose)
+    max_dose = max(e.dose.amount for e in events if e.dose)
 
     if ignore_doses_fewer_than and ignore_doses_fewer_than > len(grouped_by_date):
         return
@@ -168,6 +167,14 @@ def _plot_frequency(events, count=True, count_by_date=True):
     plt.show()
 
 
+def filter_events_by_args(events: List[Event], args: List[str]):
+    if not args:
+        print("Missing argument")
+
+    return [e for e in events
+            if e.substance in args or set(args).intersection(set(e.tags))]
+
+
 def main():
     msgcounter = MsgCounterHandler()
 
@@ -185,18 +192,15 @@ def main():
         if sys.argv[1] == "events":
             print_events(events)
         elif sys.argv[1] == "doses":
-            if len(sys.argv) < 3:
-                print("Missing argument")
-            else:
-                for substance in sys.argv[2:]:
-                    _print_daily_doses(events, substance)
+            args = sys.argv[2:]
+            for arg in args:
+                _print_daily_doses(filter_events_by_args(events, [arg]), arg)
         elif sys.argv[1] == "substances":
             _print_substancelist(events)
         elif sys.argv[1] == "plot":
-            substances = sys.argv[2:]
-            if substances:
-                events = [e for e in events
-                          if e.substance in substances or set(substances).intersection(set(e.tags))]
+            args = sys.argv[2:]
+            if args:
+                events = filter_events_by_args(events, args)
             _plot_frequency(events)
         else:
             _print_usage()

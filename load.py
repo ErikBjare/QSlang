@@ -6,7 +6,6 @@ import json
 from typing import List
 from pathlib import Path
 
-from dose import Dose
 from event import Event
 from parse import parse
 
@@ -82,7 +81,6 @@ def load_events():
 
     events = sorted([e for note in notes for e in parse(note)])
     events = _extend_substance_abbrs(events)
-    events = _annotate_doses(events)
     events = _tag_substances(events)
     return events
 
@@ -121,16 +119,6 @@ def _tag_substances(events: List[Event]) -> List[Event]:
             e.data["tags"] = cats
     n_categorized = len([e for e in events if e.tags])
     print(f"Categorized {n_categorized} out {len(events)} of events ({round(n_categorized/len(events)*100, 1)}%)")
-    return events
-
-
-def _annotate_doses(events: List[Event]) -> List[Event]:
-    for e in events:
-        try:
-            e.data["dose"] = Dose(e.substance, e.data["amount"])
-        except Exception as exc:
-            log.warning(f"Unable to annotate dose: {exc}")
-            events.remove(e)
     return events
 
 
