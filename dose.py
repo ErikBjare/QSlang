@@ -7,7 +7,7 @@ from typing import Tuple
 
 log = logging.getLogger(__name__)
 
-_r = re.compile(r"([0-9]+\.?[0-9]*e?-?[0-9]*)(u|mc|d|c|m)?(l|g)?")
+_r = re.compile(r"([0-9]+\.?[0-9]*e?-?[0-9]*)(μ|u|mc|d|c|m)?(l|g)?")
 
 
 def split_amtstr(s: str) -> Tuple[float, str, str]:
@@ -29,9 +29,7 @@ def _norm_amount(n: float, p: str) -> float:
         n *= 0.01
     elif p == "m":
         n *= 0.001
-    elif p == "mc":
-        n *= 0.000001
-    elif p == "u":
+    elif p in ["mc", "u", "μ"]:
         n *= 0.000001
     return n
 
@@ -92,6 +90,8 @@ def test_sum_amount():
     assert _sum_amount("0g", "1g") == "1.0g"
     assert _sum_amount("1mg", "10mg") == "11.0mg"
     assert _sum_amount("500mcg", "1mg") == "1.5mg"
+    assert _sum_amount("100mcg", "100ug") == "200.0mcg"
+    assert _sum_amount("100mcg", "100μg") == "200.0mcg"
 
     assert _sum_amount("1ml", "2ml") == "3.0ml"
     assert _sum_amount("1dl", "4dl") == "500.0ml"
