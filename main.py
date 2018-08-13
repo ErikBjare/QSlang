@@ -4,7 +4,7 @@ import sys
 import logging
 import statistics
 import itertools
-from typing import List
+from typing import List, Dict, Tuple
 from copy import copy
 from collections import Counter, defaultdict
 from datetime import date
@@ -79,13 +79,13 @@ def _print_daily_doses(events: List[Event], substance: str, ignore_doses_fewer_t
         print(f"   - {roa.ljust(10)}  n: {len(grouped_by_roa[roa])}")
 
 
-def _print_substancelist(events):
+def _print_substancelist(events: List[Event]) -> None:
     substances = {e.substance for e in events if e.substance}
     for substance in sorted(substances):
         _print_daily_doses(events, substance, ignore_doses_fewer_than=2)
 
 
-def _print_usage():
+def _print_usage() -> None:
     print("Usage: python3 main.py <subcommand>")
     print("Subcommands:")
     print(" - events")
@@ -96,21 +96,81 @@ def _print_usage():
 
 class MsgCounterHandler(logging.Handler):
     """https://stackoverflow.com/a/31142078/965332"""
-    level2count = None
+    level2count: Dict[str, int]
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
         super(MsgCounterHandler, self).__init__(*args, **kwargs)
-        self.level2count = {}
+        self.level2count = defaultdict(int)
 
-    def emit(self, record):
-        levelname = record.levelname
-        if levelname not in self.level2count:
-            self.level2count[levelname] = 0
-        self.level2count[levelname] += 1
+    def emit(self, record) -> None:
+        self.level2count[record.levelname] += 1
 
 
 def igroupby(l, key=lambda x: x):
     return {k: list(v) for k, v in groupby(sorted(l, key=key), key=key)}
+
+
+def _grouped_by_date(events: List[Event]) -> Dict[Tuple[int, int], List[Event]]:
+    grouped_by_date: Dict[Tuple[int, int], List[Event]] = defaultdict(list)
+    for period, events_grouped in groupby(events, key=lambda e: (e.timestamp.year, e.timestamp.month)):
+        grouped_by_date[period] = list(events_grouped)
+    return grouped_by_date
+
+
+TValueByDate = Dict[Tuple[int, int], float]
+
+
+def _sum_doses(events: List[Event]) -> Dict[str, TValueByDate]:
+    substances = {e.substance for e in events if e.substance}
+    grouped_by_date = _grouped_by_date(events)
+
+    period_counts: Dict[str, Dict[Tuple[int, int], float]] = defaultdict(lambda: defaultdict(float))
+    for period in grouped_by_date.keys():
+        events = grouped_by_date[period]
+        grouped_by_substance = igroupby(events, key=lambda e: e.substance)
+        c = Counter({substance: sum(e.dose.amount for e in events if e.dose) for substance, events in grouped_by_substance.items()})
+        unit = next(map(lambda e: e.unit, events))
+
+        print(period)
+        for k, v in c.most_common(20):
+            print(f" - {v}{unit} {k}")
+
+        for s in substances:
+            period_counts[s][period] = c[s]
+
+    return period_counts
+
+
+def _count_doses(events: List[Event], one_per_day=True) -> Dict[str, TValueByDate]:
+    substances = {e.substance for e in events if e.substance}
+    grouped_by_date = _grouped_by_date(events)
+
+    period_counts: Dict[str, Dict[Tuple[int, int], float]] = defaultdict(lambda: defaultdict(float))
+    for period in grouped_by_date.keys():
+        events = grouped_by_date[period]
+        grouped_by_substance = igroupby(events, key=lambda e: e.substance)
+        if one_per_day:
+            c = Counter({substance: len({e.timestamp.date() for e in events}) for substance, events in grouped_by_substance.items()})
+        else:
+            c = Counter({substance: len(events) for substance, events in grouped_by_substance.items()})
+        unit = " days" if one_per_day else "x"
+
+        print(period)
+        for k, v in c.most_common(20):
+            print(f" - {v}{unit} {k}")
+
+        for s in substances:
+            period_counts[s][period] = c[s]
+
+    return period_counts
+
+
+def _monthrange(min_date: Tuple[int, int], max_date: Tuple[int, int]):
+    (min_year, min_month) = min_date
+    (max_year, max_month) = max_date
+    g = itertools.product(range(min_year, max_year + 1), range(1, 13))
+    g = itertools.dropwhile(lambda t: t < (min_year, min_month), g)
+    return list(itertools.takewhile(lambda t: t <= (max_year, max_month), g))
 
 
 def _plot_frequency(events, count=True, count_by_date=True):
@@ -122,46 +182,19 @@ def _plot_frequency(events, count=True, count_by_date=True):
     # Filter away journal entries and sort
     events = list(sorted(filter(lambda e: e.type == "data", events)))
 
-    labels = []
-    substances = {e.substance for e in events}
+    if count:
+        period_counts = _count_doses(events, one_per_day=count_by_date)
+    else:
+        period_counts = _sum_doses(events)
 
-    grouped_by_date = defaultdict(list)
-    for period, events_grouped in groupby(events, key=lambda e: (e.timestamp.year, e.timestamp.month)):
-        grouped_by_date[period] = list(events_grouped)
-        labels.append(period)
-
-    def _fill_blank_dates(labels_tuples):
-        (min_year, min_month) = min(labels_tuples)
-        (max_year, max_month) = max(labels_tuples)
-        g = itertools.product(range(min_year, max_year + 1), range(1, 13))
-        g = itertools.dropwhile(lambda t: t < (min_year, min_month), g)
-        return list(itertools.takewhile(lambda t: t <= (max_year, max_month), g))
-
-    period_counts = defaultdict(list)
-    labels = _fill_blank_dates(labels)
-    for period in labels:
-        events = grouped_by_date[period]
-        grouped_by_substance = igroupby(events, key=lambda e: e.substance)
-        if count:
-            if count_by_date:
-                c = Counter({substance: len({e.timestamp.date() for e in events}) for substance, events in grouped_by_substance.items()})
-            else:
-                c = Counter({substance: len(events) for substance, events in grouped_by_substance.items()})
-            unit = "x"
-        else:
-            c = Counter({substance: sum(e.data["dose"].amount for e in events if "dose" in e.data) for substance, events in grouped_by_substance.items()})
-            unit = events[0].data["dose"].unit if events and "dose" in events[0].data else ""
-
-        print(period)
-        for k, v in c.most_common(20):
-            print(f" - {v}{unit} {k}")
-
-        for s in sorted(substances):
-            period_counts[s].append(c[s])
+    labels = [date for sd in period_counts for date in period_counts[sd].keys()]
+    labels = _monthrange(min(labels), max(labels))
+    labels_str = ["-".join(map(str, t)) for t in labels]
 
     stackheight = np.zeros(len(labels))
-    for substance, n in period_counts.items():
-        plt.bar(["-".join(map(str, t)) for t in labels], n, label=substance, bottom=stackheight)
+    for substance, value_by_date in period_counts.items():
+        n = [value_by_date[label] if label in value_by_date else 0 for label in labels]
+        plt.bar(labels_str, n, label=substance, bottom=stackheight)
         stackheight += np.array(n)
 
     plt.xticks(rotation='vertical')
@@ -184,7 +217,6 @@ def main():
     if verbose:
         sys.argv.remove("-v")
     logging.basicConfig(level=logging.DEBUG if verbose else logging.ERROR)
-
     logging.getLogger().addHandler(msgcounter)
 
     events = load_events()
@@ -210,7 +242,7 @@ def main():
         _print_usage()
 
     if msgcounter.level2count:
-        print(f'Messages logged: {msgcounter.level2count}')
+        print(f'Messages logged: {dict(msgcounter.level2count)}')
 
 
 if __name__ == "__main__":
