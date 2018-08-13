@@ -3,13 +3,11 @@
 import sys
 import logging
 import statistics
-import itertools
 from typing import List, Dict, Tuple
 from copy import copy
 from collections import Counter, defaultdict
 from datetime import date
 from itertools import groupby
-from functools import reduce
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -17,6 +15,8 @@ import numpy as np
 from event import Event
 from load import load_events
 from dose import Dose, _fmt_amount
+from util import MsgCounterHandler, monthrange
+from igroupby import igroupby
 
 
 log = logging.getLogger(__name__)
@@ -53,7 +53,8 @@ def _print_daily_doses(events: List[Event], substance: str, ignore_doses_fewer_t
         try:
             amt = Dose(substance, f"0{unit}")
             for e in v:
-                amt += e.dose
+                if e.dose:
+                    amt += e.dose
             tot_amt += amt
         except Exception as e:
             log.warning(f"Unable to sum amounts '{v}', '{tot_amt}': {e}")
@@ -92,22 +93,6 @@ def _print_usage() -> None:
     print(" - substances")
     print(" - doses <substances>")
     print(" - plot <substances>")
-
-
-class MsgCounterHandler(logging.Handler):
-    """https://stackoverflow.com/a/31142078/965332"""
-    level2count: Dict[str, int]
-
-    def __init__(self, *args, **kwargs) -> None:
-        super(MsgCounterHandler, self).__init__(*args, **kwargs)
-        self.level2count = defaultdict(int)
-
-    def emit(self, record) -> None:
-        self.level2count[record.levelname] += 1
-
-
-def igroupby(l, key=lambda x: x):
-    return {k: list(v) for k, v in groupby(sorted(l, key=key), key=key)}
 
 
 def _grouped_by_date(events: List[Event]) -> Dict[Tuple[int, int], List[Event]]:
@@ -165,14 +150,6 @@ def _count_doses(events: List[Event], one_per_day=True) -> Dict[str, TValueByDat
     return period_counts
 
 
-def _monthrange(min_date: Tuple[int, int], max_date: Tuple[int, int]):
-    (min_year, min_month) = min_date
-    (max_year, max_month) = max_date
-    g = itertools.product(range(min_year, max_year + 1), range(1, 13))
-    g = itertools.dropwhile(lambda t: t < (min_year, min_month), g)
-    return list(itertools.takewhile(lambda t: t <= (max_year, max_month), g))
-
-
 def _plot_frequency(events, count=True, count_by_date=True):
     """
     Should plot frequency of use over time
@@ -188,7 +165,7 @@ def _plot_frequency(events, count=True, count_by_date=True):
         period_counts = _sum_doses(events)
 
     labels = [date for sd in period_counts for date in period_counts[sd].keys()]
-    labels = _monthrange(min(labels), max(labels))
+    labels = monthrange(min(labels), max(labels))
     labels_str = ["-".join(map(str, t)) for t in labels]
 
     stackheight = np.zeros(len(labels))

@@ -6,6 +6,7 @@ test:
 
 test-integration:
 	python3 main.py doses Noopept
+	python3 main.py plot Noopept
 	python3 main.py events
 
 typecheck:
