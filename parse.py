@@ -12,7 +12,7 @@ log = logging.getLogger(__name__)
 
 re_date = re.compile(r"[0-9]+-[0-9]+-[0-9]+")
 re_time = re.compile(r"[~+]*[0-9]{1,2}:[0-9]{1,2}")
-re_amount = re.compile(r"[~]?[?0-9\.]+(k|c|d|mc|m|u|n)?(l|L|g|IU|x)?")
+re_amount = re.compile(r"[~≤]?[?0-9\.]+(k|c|d|mc|m|u|n)?(l|L|g|IU|x)?")
 re_extra = re.compile(r"\(.*\)")
 re_roa = re.compile(r"(orall?y?|buccal|subcut|smoked|vaporized|insuffl?a?t?e?d?|chewed|subli?n?g?u?a?l?|intranasal|spliff)")
 
@@ -98,7 +98,7 @@ def parse(text: str) -> List[Event]:
                         events.append(Event(timestamp, "data", entry))
                 else:
                     # Journal entry
-                    events.append(Event(timestamp, "journal", data))
+                    events.append(Event(timestamp, "journal", {"raw": data}))
             elif line:
                 log.debug(f"Couldn't identify line-type: {line}")
 

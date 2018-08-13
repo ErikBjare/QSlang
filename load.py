@@ -3,20 +3,14 @@
 import re
 import logging
 import json
-from typing import List
+from typing import List, Dict
 from pathlib import Path
 
 from event import Event
-from parse import parse
+from parse import parse, re_date
 
 
 log = logging.getLogger(__name__)
-
-re_date = re.compile(r"[0-9]+-[0-9]+-[0-9]+")
-re_time = re.compile(r"[~+]*[0-9]{1,2}:[0-9]{1,2}")
-re_amount = re.compile(r"[~]?[?0-9\.]+(k|c|d|mc|m|u|n)?(l|L|g|IU|x)?")
-re_extra = re.compile(r"\(.*\)")
-re_roa = re.compile(r"(orall?y?|buccal|subcut|smoked|vaporized|insuffl?a?t?e?d?|chewed|subli?n?g?u?a?l?|intranasal|spliff)")
 
 re_evernote_author = re.compile(r'>author:(.+)$')
 re_evernote_source = re.compile(r'>source:(.+)$')
@@ -69,23 +63,27 @@ def _load_evernote() -> List[str]:
         dates = re_date.findall(str(p))
         if dates:
             dateset.add(dates[0])
+
+            # Remove metadata lines
+            data = "\n".join(line for line in data.split("\n") if not (line.startswith(">") or line.startswith("---") or line.startswith("##")))
+
             notes.append(data)
     # pprint(sorted(dates))
     return notes
 
 
-def load_events():
-    notes = []
-    notes += _load_standard_notes()
-    notes += _load_evernote()
-
-    events = sorted([e for note in notes for e in parse(note)])
+def load_events() -> List[Event]:
+    events: List[Event] = []
+    for note in _load_standard_notes():
+        events += parse(note)
+    for note in _load_evernote():
+        events += parse(note)
     events = _extend_substance_abbrs(events)
     events = _tag_substances(events)
-    return events
+    return sorted(events)
 
 
-def _load_substance_categories():
+def _load_substance_categories() -> Dict[str, List[str]]:
     # TODO: Support more than one category per substance
     p = Path("data/substance_categories.csv")
     if p.is_file():
@@ -114,7 +112,7 @@ substance_map = _load_substance_map()
 
 def _tag_substances(events: List[Event]) -> List[Event]:
     for e in events:
-        if e.substance.lower() in substance_categories:
+        if e.substance and e.substance.lower() in substance_categories:
             cats = substance_categories[e.substance.lower()]
             e.data["tags"] = cats
     n_categorized = len([e for e in events if e.tags])
@@ -124,7 +122,7 @@ def _tag_substances(events: List[Event]) -> List[Event]:
 
 def _extend_substance_abbrs(events) -> List[Event]:
     for e in events:
-        if e.substance.lower() in substance_map:
+        if e.substance and e.substance.lower() in substance_map:
             e.data["substance"] = substance_map[e.substance.lower()]
     return events
 

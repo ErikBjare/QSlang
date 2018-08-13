@@ -7,7 +7,7 @@ from typing import Tuple
 
 log = logging.getLogger(__name__)
 
-_r = re.compile(r"([0-9]+\.?[0-9]*e?-?[0-9]*)(mc|d|c|m)?(l|g)?")
+_r = re.compile(r"([0-9]+\.?[0-9]*e?-?[0-9]*)(u|mc|d|c|m)?(l|g)?")
 
 
 def split_amtstr(s: str) -> Tuple[float, str, str]:
@@ -30,6 +30,8 @@ def _norm_amount(n: float, p: str) -> float:
     elif p == "m":
         n *= 0.001
     elif p == "mc":
+        n *= 0.000001
+    elif p == "u":
         n *= 0.000001
     return n
 
@@ -67,8 +69,12 @@ class Dose:
         return _fmt_amount(self.amount, self.unit)
 
     def __add__(self, other: "Dose") -> "Dose":
-        assert self.substance == other.substance
-        assert self.unit == other.unit
+        assert self.substance.lower() == other.substance.lower()
+        try:
+            assert self.unit == other.unit
+        except AssertionError as e:
+            log.warning(f"Units were not equal: '{self.unit}' != '{other.unit}'")
+            raise e
         return Dose(self.substance, _sum_amount(self.amount_with_unit, other.amount_with_unit))
 
 

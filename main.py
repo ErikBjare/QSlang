@@ -40,7 +40,7 @@ def print_events(events: List[Event]) -> None:
 
 
 def _print_daily_doses(events: List[Event], substance: str, ignore_doses_fewer_than=None):
-    events = [e for e in events if e.substance and e.substance.lower() == substance.lower()]
+    events = [e for e in events if e.substance and e.substance.lower() == substance.lower() and e.dose]
     if not events:
         print(f"No doses found for substance '{substance}'")
         return
@@ -51,10 +51,12 @@ def _print_daily_doses(events: List[Event], substance: str, ignore_doses_fewer_t
     tot_amt = Dose(substance, f"0{unit}")
     for _, v in grouped_by_date.items():
         try:
-            amt = reduce(lambda amt, e2: amt + e2.dose, v, Dose(substance, f"0{unit}"))
+            amt = Dose(substance, f"0{unit}")
+            for e in v:
+                amt += e.dose
             tot_amt += amt
         except Exception as e:
-            log.warning(f"Unable to parse amount '{v}': {e}")
+            log.warning(f"Unable to sum amounts '{v}', '{tot_amt}': {e}")
 
     median_dose = statistics.median(e.dose.amount for e in events if e.dose)
     min_dose = min(e.dose.amount for e in events if e.dose)
@@ -78,8 +80,7 @@ def _print_daily_doses(events: List[Event], substance: str, ignore_doses_fewer_t
 
 
 def _print_substancelist(events):
-    events = [e for e in events if isinstance(e.data, dict)]
-    substances = {e.substance for e in events}
+    substances = {e.substance for e in events if e.substance}
     for substance in sorted(substances):
         _print_daily_doses(events, substance, ignore_doses_fewer_than=2)
 
@@ -88,6 +89,7 @@ def _print_usage():
     print("Usage: python3 main.py <subcommand>")
     print("Subcommands:")
     print(" - events")
+    print(" - substances")
     print(" - doses <substances>")
     print(" - plot <substances>")
 

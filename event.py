@@ -25,16 +25,13 @@ class Event:
 
     @property
     def substance(self) -> Optional[str]:
-        if isinstance(self.data, dict):
-            return self.data["substance"].strip() if "substance" in self.data else None
-        else:
-            return "unknown/journal"
+        return self.data["substance"].strip() if "substance" in self.data else None
 
     @property
     def dose(self) -> Optional[Dose]:
-        if self.substance and "amount" in self.data:
+        if self.substance and self.amount:
             try:
-                return Dose(self.substance, self.data["amount"])
+                return Dose(self.substance, self.amount)
             except Exception as e:
                 log.warning(f"Unable to build Dose object: {e}")
                 return None
@@ -44,6 +41,11 @@ class Event:
     @property
     def unit(self):
         return self.dose.unit if self.dose else None
+
+    @property
+    def amount(self):
+        # TODO: Move stripping of '~' etc into parsing and annotate meaning using tags?
+        return self.data["amount"].strip("~") if "amount" in self.data else None
 
     @property
     def roa(self):

@@ -2,14 +2,14 @@ run:
 	python3 main.py
 
 test:
-	python3 -m pytest main.py
+	python3 -m pytest *.py
 
 test-integration:
 	python3 main.py doses Noopept
 	python3 main.py events
 
 typecheck:
-	python3 -m mypy main.py
+	python3 -m mypy --ignore-missing-import *.py
 
 data/private/Evernote:
 	cd thirdparty/evernote-dump/source/ && \
