@@ -36,7 +36,7 @@ def _norm_amount(n: float, p: str) -> float:
 
 def _best_prefix(n: float) -> Tuple[str, float]:
     if 1e-6 <= n < 1e-3:
-        return "mc", 0.000001
+        return "u", 0.000001
     elif 1e-3 <= n < 1e-0:
         return "m", 0.001
     # elif 1e-2 <= n < 1e-1:
@@ -90,8 +90,8 @@ def test_sum_amount():
     assert _sum_amount("0g", "1g") == "1.0g"
     assert _sum_amount("1mg", "10mg") == "11.0mg"
     assert _sum_amount("500mcg", "1mg") == "1.5mg"
-    assert _sum_amount("100mcg", "100ug") == "200.0mcg"
-    assert _sum_amount("100mcg", "100μg") == "200.0mcg"
+    assert _sum_amount("100mcg", "100ug") == "200.0ug"
+    assert _sum_amount("100mcg", "100μg") == "200.0ug"
 
     assert _sum_amount("1ml", "2ml") == "3.0ml"
     assert _sum_amount("1dl", "4dl") == "500.0ml"

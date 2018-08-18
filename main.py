@@ -3,6 +3,7 @@
 import sys
 import logging
 import statistics
+import fnmatch
 from typing import List, Dict, Tuple
 from copy import copy
 from collections import Counter, defaultdict
@@ -91,8 +92,8 @@ def _print_usage() -> None:
     print("Subcommands:")
     print(" - events")
     print(" - substances")
-    print(" - doses <substances>")
-    print(" - plot <substances>")
+    print(" - doses [substance or #tag]")
+    print(" - plot [substance or #tag]")
 
 
 def _grouped_by_date(events: List[Event]) -> Dict[Tuple[int, int], List[Event]]:
@@ -183,8 +184,14 @@ def filter_events_by_args(events: List[Event], args: List[str]):
     if not args:
         print("Missing argument")
 
-    return [e for e in events
-            if e.substance in args or set(args).intersection(set(e.tags))]
+    matches = []
+    for e in events:
+        for arg in args:
+            if (e.substance and fnmatch.fnmatch(e.substance.lower(), arg.lower())) or \
+               arg[0] == "#" and arg.strip("#").lower() in set(map(lambda e: e.lower(), e.tags)):
+                matches.append(e)
+                break
+    return matches
 
 
 def main():
@@ -204,8 +211,12 @@ def main():
             print_events(events)
         elif sys.argv[1] == "doses":
             args = sys.argv[2:]
-            for arg in args:
-                _print_daily_doses(filter_events_by_args(events, [arg]), arg)
+            events = filter_events_by_args(events, args)
+            if events:
+                for substance, substance_events in igroupby(events, lambda e: e.substance).items():
+                    _print_daily_doses(substance_events, substance)
+            else:
+                print("No matching events found")
         elif sys.argv[1] == "substances":
             _print_substancelist(events)
         elif sys.argv[1] == "plot":

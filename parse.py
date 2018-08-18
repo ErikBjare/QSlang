@@ -58,7 +58,7 @@ def parse_time(s: str) -> Tuple[time, List[str]]:
     try:
         t = datetime.strptime(s, "%H:%M").time()
     except ValueError as e:
-        print(f"Tried to parse time: {s}")
+        log.warning(f"Tried to parse time: {s}")
         raise e
     return t, tags
 
