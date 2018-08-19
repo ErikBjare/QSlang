@@ -13,10 +13,10 @@ log = logging.getLogger(__name__)
 
 re_date = re.compile(r"[0-9]+-[0-9]+-[0-9]+")
 re_time = re.compile(r"[~+]*[0-9]{1,2}:[0-9]{1,2}")
-re_amount = re.compile(r"[~≤]?[?0-9\.]+(?:k|c|d|mc|m|u|n)?(?:l|L|g|IU|x| ?tsp| ?tbsp| )")
+re_amount = re.compile(r"[~≤<>=]?[?0-9\.]+(?:k|c|d|mc|m|u|n)?(?:l|L|g|IU|x| ?tb?sp|(?= ))\b")
 re_extra = re.compile(r"[(].*[)]")
 re_substance = re.compile(r"[-\w ]=")
-re_roa = re.compile(r"(oral(?:ly)?|subcut\w*|smoked|vap(?:ed|o?r?i?z?e?d?)|spliff|chewed|buccal(?:ly)?|subl(?:ingual)?|rectal(?:ly)?|insuff(?:lated)?|intranasal|IM|intramuscular|IV|intravenous|topical|transdermal|drinked|tea)")
+re_roa = re.compile(r"\b(oral(?:ly)?|subcut\w*|smoked|vap(?:ed|o?r?i?z?e?d?)|spliff|chewed|buccal(?:ly)?|subl(?:ingual)?|rectal(?:ly)?|insuff(?:lated)?|intranasal|IM|intramuscular|IV|intravenous|topical|transdermal|drinked)\b")
 re_concentration = re.compile(r"[?0-9\.]+%")
 
 
@@ -158,6 +158,34 @@ def test_parse():
 
     assert events[3].substance == "Cocoa"
     assert events[3].amount == "5g"
+
+
+def test_parse_amount():
+    test_str = """
+    # 2018-04-14
+    12:00 - 30 situps
+    12:01 - 30x situps
+    12:02 - 2tbsp sugar
+    """
+    events = parse(test_str)
+    assert len(events) == 3
+    assert events[0].amount == "30"
+    assert events[1].amount == "30x"
+    assert events[2].amount == "2tbsp"
+
+
+def test_parse_roa():
+    test_str = """
+    # 2018-04-14
+    12:00 - 1x Otrivin intranasal
+    12:01 - 1x Somethingwithoralinit subcutaneous
+    """
+    events = parse(test_str)
+    assert len(events) == 2
+    assert events[0].substance == "Otrivin"
+    assert events[0].roa == "intranasal"
+    assert events[1].substance == "Somethingwithoralinit"
+    assert events[1].roa == "subcutaneous"
 
 
 def test_parse_with_plus_in_extras():
