@@ -82,9 +82,10 @@ def _print_daily_doses(events: List[Event], substance: str, ignore_doses_fewer_t
 
 
 def _print_substancelist(events: List[Event]) -> None:
-    substances = {e.substance for e in events if e.substance}
-    for substance in sorted(substances):
-        _print_daily_doses(events, substance, ignore_doses_fewer_than=2)
+    c = Counter({k: len(v) for k, v in igroupby([e for e in events if e.substance], lambda e: e.substance).items()})
+    for s, n in c.most_common():
+        print(f"{n}x\t{s}")
+    print(f"{len(c)} substances found")
 
 
 def _print_usage() -> None:

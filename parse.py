@@ -13,11 +13,10 @@ log = logging.getLogger(__name__)
 
 re_date = re.compile(r"[0-9]+-[0-9]+-[0-9]+")
 re_time = re.compile(r"[~+]*[0-9]{1,2}:[0-9]{1,2}")
-re_amount = re.compile(r"[~≤]?[?0-9\.]+(?:k|c|d|mc|m|u|n)?(?:l|L|g|IU|x)")
+re_amount = re.compile(r"[~≤]?[?0-9\.]+(?:k|c|d|mc|m|u|n)?(?:l|L|g|IU|x| ?tsp| ?tbsp| )")
 re_extra = re.compile(r"[(].*[)]")
 re_substance = re.compile(r"[-\w ]=")
-#re_roa = re.compile(r"(oral(?:ly)?|subcut\w*|smoked|vap(?:orized|ed)|spliff|chewed|buccal(?:ly?)|subl(?:ingual)?|rectal(?:ly)\w*|insuff(?:lated)|intranasal|(?:IM|intramuscular)|(?:IV|intravenous)\w|topical|transdermal)")
-re_roa = re.compile(r"(oral)")
+re_roa = re.compile(r"(oral(?:ly)?|subcut\w*|smoked|vap(?:ed|o?r?i?z?e?d?)|spliff|chewed|buccal(?:ly)?|subl(?:ingual)?|rectal(?:ly)?|insuff(?:lated)?|intranasal|IM|intramuscular|IV|intravenous|topical|transdermal|drinked|tea)")
 re_concentration = re.compile(r"[?0-9\.]+%")
 
 
@@ -37,6 +36,13 @@ def test_pop_regex():
     assert not s
 
 
+def _dict_pop_None(d: Dict):
+    """pops keys with value None in-place"""
+    keys_None = [k for k in d if d[k] is None]
+    for k in keys_None:
+        d.pop(k)
+
+
 def parse_data(data: str) -> List[Dict[str, Any]]:
     datas = []
     if re_amount.match(data):
@@ -51,19 +57,22 @@ def parse_data(data: str) -> List[Dict[str, Any]]:
                 d["attributes"] = [a.strip() for a in extra.split(",")]
                 for attribute in d["attributes"]:
                     subevents = parse_data(attribute)
-                    print(attribute, subevents)
                     if subevents:
                         d["subevents"].extend(subevents)
                     _, concentration = _pop_regex(attribute, re_concentration)
                     if concentration:
                         d["concentration"] = concentration
 
-                # FIXME: Probably won't work if extras contain both subevents and attributes
             d["substance"] = entry.strip("\\").strip().strip(")")
 
             datas.append(d)
             if "subevents" in d:
                 datas.extend(d["subevents"])
+
+    # Remove None data fields
+    for d in datas:
+        _dict_pop_None(d)
+
     return datas
 
 
