@@ -46,7 +46,9 @@ def _dict_pop_None(d: Dict):
 def parse_data(data: str) -> List[Dict[str, Any]]:
     datas = []
     if re_amount.match(data):
-        for entry in (e for e in re.split(r'[+]\s*(?![^()]*\))', data)):
+        # regexp matches all plusses or commas not within parens or brackets
+        # taken from: https://stackoverflow.com/a/26634150/965332
+        for entry in (e for e in re.split(r'[+,]\s*(?![^()]*\))', data)):
             d: Dict[str, Any] = {"raw": entry}
             entry, d["amount"] = _pop_regex(entry, re_amount)
             entry, d["roa"] = _pop_regex(entry, re_roa)
