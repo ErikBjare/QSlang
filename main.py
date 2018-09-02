@@ -109,9 +109,9 @@ def _grouped_by_date(events: List[Event], monthly=True) -> Dict[TDate, List[Even
 TValueByDate = Dict[TDate, float]
 
 
-def _sum_doses(events: List[Event]) -> Dict[str, TValueByDate]:
+def _sum_doses(events: List[Event], monthly=True) -> Dict[str, TValueByDate]:
     substances = {e.substance for e in events if e.substance}
-    grouped_by_date = _grouped_by_date(events)
+    grouped_by_date = _grouped_by_date(events, monthly=monthly)
 
     period_counts: Dict[str, Dict[TDate, float]] = defaultdict(lambda: defaultdict(float))
     for period in grouped_by_date.keys():
@@ -122,7 +122,7 @@ def _sum_doses(events: List[Event]) -> Dict[str, TValueByDate]:
 
         print(period)
         for k, v in c.most_common(20):
-            print(f" - {v}{unit} {k}")
+            print(f" - {_fmt_amount(v, unit)} {k}")
 
         for s in substances:
             period_counts[s][period] = c[s]
@@ -154,7 +154,7 @@ def _count_doses(events: List[Event], one_per_day=True, monthly=True) -> Dict[st
     return period_counts
 
 
-def _plot_frequency(events, count=True, count_by_date=True, any_substance=False, daily=False):
+def _plot_frequency(events, count=False, count_by_date=False, any_substance=False, daily=False):
     """
     Should plot frequency of use over time
     (i.e. a barchart where the bar heights are equal to the count per period)
@@ -170,7 +170,7 @@ def _plot_frequency(events, count=True, count_by_date=True, any_substance=False,
     if count:
         period_counts = _count_doses(events, one_per_day=count_by_date, monthly=not daily)
     else:
-        period_counts = _sum_doses(events)
+        period_counts = _sum_doses(events, monthly=not daily)
 
     labels = [date for sd in period_counts for date in period_counts[sd].keys()]
     if daily:
@@ -229,6 +229,8 @@ def _build_argparser():
 
     plot.add_argument('--any', action='store_true', help='count all matches as any match')
     plot.add_argument('--daily', action='store_true', help='use daily resolution on the x-axis')
+    plot.add_argument('--count', action='store_true', help='count number of doses instead of amount')
+    plot.add_argument('--count-by-date', action='store_true', help='count only one dose per day (only makes sense if --count is given)')
 
     return parser
 
@@ -266,7 +268,7 @@ def main():
     elif args.subcommand == "substances":
         _print_substancelist(events)
     elif args.subcommand == "plot":
-        _plot_frequency(events, daily=args.daily, any_substance=args.any)
+        _plot_frequency(events, count=args.count, count_by_date=args.count_by_date, daily=args.daily, any_substance=args.any)
     else:
         parser.print_help()
 
