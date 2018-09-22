@@ -21,18 +21,9 @@ class Dose:
             self.quantity = amount
         else:
             self.quantity = Q_(amount)
-        self.quantity = self.quantity.to_base_units()
 
     def __str__(self) -> str:
         return f"{self.amount_with_unit} {self.substance}"
-
-    @property
-    def amount(self) -> float:
-        return float(self.quantity.magnitude)
-
-    @property
-    def unit(self):
-        return self.quantity.units
 
     @property
     def amount_with_unit(self) -> str:
@@ -48,6 +39,9 @@ class Dose:
     def __add__(self, other: "Dose") -> "Dose":
         assert self.substance.lower() == other.substance.lower()
         return Dose(self.substance, self.quantity + other.quantity)
+
+    def __truediv__(self, b):
+        return Dose(self.substance, self.quantity / b)
 
     def __lt__(self, other):
         return self.quantity < other.quantity

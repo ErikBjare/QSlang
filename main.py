@@ -3,7 +3,7 @@
 import logging
 import statistics
 import fnmatch
-from typing import List, Dict, Tuple, Optional, Union
+from typing import List, Dict, Tuple, Optional
 from copy import copy
 from collections import Counter, defaultdict
 from datetime import date, datetime, timedelta
@@ -14,7 +14,7 @@ import numpy as np
 
 from event import Event
 from load import load_events
-from dose import Dose, Q_
+from dose import Dose
 from util import MsgCounterHandler, monthrange, dayrange
 from igroupby import igroupby
 
@@ -28,7 +28,12 @@ def print_event(e: Event, show_misc=False) -> None:
         misc = copy(e.data)
         misc.pop('amount')
         misc.pop('substance')
-        e_str = f"{d['amount'] if 'amount' in d else '?'} {d['substance']}" + (f"  -  {misc}" if show_misc else '')
+        if e.dose:
+            base_str = str(e.dose)
+        else:
+            base_str = f"{d['amount'] if 'amount' in d else '?'} {d['substance']}"
+        misc_str = (f"  -  {misc}" if show_misc else '')
+        e_str = base_str + misc_str
     else:
         e_str = str(e.data)
     print(f"{e.timestamp.isoformat()} | {e.type.ljust(7)} | " + e_str)
@@ -45,13 +50,13 @@ def _print_daily_doses(events: List[Event], substance: str, ignore_doses_fewer_t
         print(f"No doses found for substance '{substance}'")
         return
 
-    unit = next(map(lambda e: e.unit, events))
-
     grouped_by_date = igroupby(sorted(events), key=lambda e: e.timestamp.date())
-    tot_amt = Dose(substance, f"0{unit}")
+    assert events[0].dose
+    tot_amt = Dose(substance, events[0].dose.quantity * 0)
     for _, v in grouped_by_date.items():
         try:
-            amt = Dose(substance, f"0{unit}")
+            assert v[0].dose
+            amt = Dose(substance, v[0].dose.quantity * 0)
             for e in v:
                 if e.dose:
                     amt += e.dose
@@ -59,9 +64,9 @@ def _print_daily_doses(events: List[Event], substance: str, ignore_doses_fewer_t
         except Exception as e:
             log.warning(f"Unable to sum amounts '{v}', '{tot_amt}': {e}")
 
-    median_dose = statistics.median(e.dose.amount for e in events if e.dose)
-    min_dose = min(e.dose.amount for e in events if e.dose)
-    max_dose = max(e.dose.amount for e in events if e.dose)
+    median_dose = statistics.median(e.dose for e in events if e.dose)  # type: ignore
+    min_dose = min(e.dose for e in events if e.dose)
+    max_dose = max(e.dose for e in events if e.dose)
 
     if ignore_doses_fewer_than and ignore_doses_fewer_than > len(grouped_by_date):
         return
@@ -72,8 +77,8 @@ def _print_daily_doses(events: List[Event], substance: str, ignore_doses_fewer_t
     print(f" - latest: {max(grouped_by_date)} ({(date.today() - max(grouped_by_date)).days} days ago)")
     print(f" - oldest: {min(grouped_by_date)} ({(date.today() - min(grouped_by_date)).days} days ago)")
     print(f" - {len(grouped_by_date)} days totalling {tot_amt.amount_with_unit}")
-    print(f" - avg dose/day: {_fmt_amount(tot_amt.amount/len(events), unit)}")
-    print(f" - min/median/max dose: {_fmt_amount(min_dose, unit)}/{_fmt_amount(median_dose, unit)}/{_fmt_amount(max_dose, unit)}")
+    print(f" - avg dose/day: {tot_amt/len(events)}")
+    print(f" - min/median/max dose: {min_dose.amount_with_unit}/{median_dose.amount_with_unit}/{max_dose.amount_with_unit}")
     grouped_by_roa = igroupby(events, key=lambda e: e.roa)
     print(f" - ROAs:")
     for roa in sorted(grouped_by_roa, key=lambda v: grouped_by_roa[v]):
@@ -140,7 +145,7 @@ def _sum_doses(events: List[Event], monthly=True) -> Dict[str, TValueByDate]:
             print(f" - {v}")
 
         for s in substances:
-            period_counts[s][period] = c[s].amount if isinstance(c[s], Dose) else 0  # type: ignore
+            period_counts[s][period] = c[s].quantity.to_base_units().magnitude if isinstance(c[s], Dose) else 0  # type: ignore
 
     return period_counts
 
@@ -169,7 +174,7 @@ def _count_doses(events: List[Event], one_per_day=True, monthly=True) -> Dict[st
     return period_counts
 
 
-def _plot_frequency(events, count=False, count_by_date=False, any_substance=False, daily=False):
+def _plot_frequency(events, count=False, one_per_day=False, any_substance=False, daily=False):
     """
     Should plot frequency of use over time
     (i.e. a barchart where the bar heights are equal to the count per period)
@@ -183,7 +188,7 @@ def _plot_frequency(events, count=False, count_by_date=False, any_substance=Fals
             e.data["substance"] = "Any"
 
     if count:
-        period_counts = _count_doses(events, one_per_day=count_by_date, monthly=not daily)
+        period_counts = _count_doses(events, one_per_day=one_per_day, monthly=not daily)
     else:
         period_counts = _sum_doses(events, monthly=not daily)
 
@@ -245,7 +250,7 @@ def _build_argparser():
     plot.add_argument('--any', action='store_true', help='count all matches as any match')
     plot.add_argument('--daily', action='store_true', help='use daily resolution on the x-axis')
     plot.add_argument('--count', action='store_true', help='count number of doses instead of amount')
-    plot.add_argument('--count-by-date', action='store_true', help='count only one dose per day (only makes sense if --count is given)')
+    plot.add_argument('--days', action='store_true', help='count number of days with doses')
 
     return parser
 
@@ -284,7 +289,7 @@ def _alcohol_preprocess(events: List[Event]) -> List[Event]:
                 print(f"Concentration unknown for event: {e}")
                 continue
             e.data["substance"] = "Alcohol"
-            e.data["amount"] = e.dose.quantity * conc
+            e.data["amount"] = str(e.dose.quantity * conc)
     return events
 
 
@@ -312,7 +317,7 @@ def main():
     elif args.subcommand == "substances":
         _print_substancelist(events)
     elif args.subcommand == "plot":
-        _plot_frequency(events, count=args.count, count_by_date=args.count_by_date, daily=args.daily, any_substance=args.any)
+        _plot_frequency(events, count=args.count or args.days, one_per_day=args.days, daily=args.daily, any_substance=args.any)
     else:
         parser.print_help()
 

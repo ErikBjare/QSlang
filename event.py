@@ -39,10 +39,6 @@ class Event:
             return None
 
     @property
-    def unit(self):
-        return self.dose.unit if self.dose else None
-
-    @property
     def amount(self):
         # TODO: Move stripping of '~' etc into parsing and annotate meaning using tags?
         return self.data["amount"].strip("~") if "amount" in self.data and "?" not in self.data["amount"] else None
