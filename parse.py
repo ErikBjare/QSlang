@@ -4,7 +4,7 @@ import re
 import logging
 import typing
 from typing import List, Dict, Any, Tuple, Optional
-from datetime import time, datetime
+from datetime import time, datetime, timedelta
 
 from event import Event
 
@@ -16,7 +16,7 @@ re_time = re.compile(r"[~+]*[0-9]{1,2}:[0-9]{1,2}")
 re_amount = re.compile(r"[~≤<>=]?[?0-9\.]+(?:k|c|d|mc|m|u|n)?(?:l|L|g|IU|x| ?tb?sp|(?= ))\b")
 re_extra = re.compile(r"[(].*[)]")
 re_substance = re.compile(r"[-\w ]=")
-re_roa = re.compile(r"\b(oral(?:ly)?|subcut\w*|smoked|vap(?:ed|o?r?i?z?e?d?)|spliff|chewed|buccal(?:ly)?|subl(?:ingual)?|rectal(?:ly)?|insuff(?:lated)?|intranasal|IM|intramuscular|IV|intravenous|topical|transdermal|drinked)\b")
+re_roa = re.compile(r"\b(oral(?:ly)?|subcut\w*|smoked|vap(?:ed|o?r?i?z?e?d?)|spliff|chewed|buccal(?:ly)?|subl(?:ingual)?|rectal(?:ly)?|insuff(?:lated)?|intranasal|IM|intramuscular|IV|intravenous|topical|transdermal|drinked|balloon)\b")
 re_concentration = re.compile(r"[?0-9\.]+%")
 
 
@@ -120,7 +120,10 @@ def parse(text: str) -> List[Event]:
                     t, tags = parse_time(line.split("-")[0].strip())
                 except ValueError:
                     continue
+
                 timestamp = datetime.combine(current_date.date(), t)
+                if "time-tomorrow" in tags:
+                    timestamp += timedelta(days=1)
 
                 # Check if timestamp is in future (likely result of date in the future)
                 if timestamp > now:

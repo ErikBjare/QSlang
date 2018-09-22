@@ -3,10 +3,10 @@
 import logging
 import statistics
 import fnmatch
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Tuple, Optional, Union
 from copy import copy
 from collections import Counter, defaultdict
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from itertools import groupby
 
 import matplotlib.pyplot as plt
@@ -14,7 +14,7 @@ import numpy as np
 
 from event import Event
 from load import load_events
-from dose import Dose, _fmt_amount
+from dose import Dose, Q_
 from util import MsgCounterHandler, monthrange, dayrange
 from igroupby import igroupby
 
@@ -99,9 +99,12 @@ def _print_usage() -> None:
 TDate = Tuple[int, int, Optional[int]]
 
 
-def _grouped_by_date(events: List[Event], monthly=True) -> Dict[TDate, List[Event]]:
+def _grouped_by_date(events: List[Event], monthly=True, offset=True) -> Dict[TDate, List[Event]]:
     grouped_by_date: Dict[Tuple[int, int, Optional[int]], List[Event]] = defaultdict(list)
-    for period, events_grouped in groupby(events, key=lambda e: (e.timestamp.year, e.timestamp.month, None if monthly else e.timestamp.day)):
+    offset = timedelta(hours=6) if offset else timedelta(0)
+    for period, events_grouped in groupby(events, key=lambda e: (
+            (e.timestamp + offset).year, (e.timestamp + offset).month, None
+            if monthly else (e.timestamp + offset).day)):
         grouped_by_date[period] = list(events_grouped)
     return grouped_by_date
 
@@ -109,23 +112,35 @@ def _grouped_by_date(events: List[Event], monthly=True) -> Dict[TDate, List[Even
 TValueByDate = Dict[TDate, float]
 
 
+def _dosesum(doses):
+    doses = list(doses)
+    if not doses:
+        return 0
+    acc = doses[0]
+    for dose in doses[1:]:
+        acc += dose
+    return acc
+
+
 def _sum_doses(events: List[Event], monthly=True) -> Dict[str, TValueByDate]:
     substances = {e.substance for e in events if e.substance}
+    events = [e for e in events if e.dose]
     grouped_by_date = _grouped_by_date(events, monthly=monthly)
 
     period_counts: Dict[str, Dict[TDate, float]] = defaultdict(lambda: defaultdict(float))
     for period in grouped_by_date.keys():
-        events = grouped_by_date[period]
-        grouped_by_substance = igroupby(events, key=lambda e: e.substance)
-        c = Counter({substance: sum(e.dose.amount for e in events if e.dose) for substance, events in grouped_by_substance.items()})
-        unit = next(map(lambda e: e.unit, events))
+        events_g_date = grouped_by_date[period]
+        events_g_substance = igroupby(events_g_date, key=lambda e: e.substance)
+        c = Counter({substance: _dosesum(e.dose for e in _events)
+                     for substance, _events in events_g_substance.items() if substance})
 
         print(period)
         for k, v in c.most_common(20):
-            print(f" - {_fmt_amount(v, unit)} {k}")
+            assert k
+            print(f" - {v}")
 
         for s in substances:
-            period_counts[s][period] = c[s]
+            period_counts[s][period] = c[s].amount if isinstance(c[s], Dose) else 0  # type: ignore
 
     return period_counts
 
@@ -225,7 +240,7 @@ def _build_argparser():
     plot = subparsers.add_parser('plot', help='plot doses over time')
 
     for subparser in [events, substances, doses, plot]:
-        subparser.add_argument('substances', nargs='+', help='substances or #tags to include')
+        subparser.add_argument('substances', nargs='*', help='substances or #tags to include')
 
     plot.add_argument('--any', action='store_true', help='count all matches as any match')
     plot.add_argument('--daily', action='store_true', help='use daily resolution on the x-axis')
@@ -261,14 +276,15 @@ def _alcohol_preprocess(events: List[Event]) -> List[Event]:
         if 'Alcohol' in e.tags:
             conc_str = e.data.get("concentration", None)
             if conc_str:
-                conc = 0.01 * float(conc_str.strip("%"))
+                if "?" not in conc_str:
+                    conc = 0.01 * float(conc_str.strip("%"))
             elif e.substance.lower() in _alcohol_conc_assumptions:
                 conc = _alcohol_conc_assumptions[e.substance.lower()]
             else:
                 print(f"Concentration unknown for event: {e}")
                 continue
             e.data["substance"] = "Alcohol"
-            e.data["amount"] = _fmt_amount(e.dose.amount * conc, e.dose.unit)
+            e.data["amount"] = e.dose.quantity * conc
     return events
 
 

@@ -1,100 +1,80 @@
 #!/bin/env python3
 
-import re
 import logging
-from typing import Tuple
+import pint
+from typing import Union
 
 
 log = logging.getLogger(__name__)
 
-_r = re.compile(r"([0-9]+\.?[0-9]*e?-?[0-9]*)(μ|u|mc|d|c|m)?(l|g)?")
 
-
-def split_amtstr(s: str) -> Tuple[float, str, str]:
-    try:
-        n, p, u = _r.findall(s)[0]
-        return float(n), p, u
-    except Exception as e:
-        raise Exception(f"Unable to split amount string: {s} ({e})")
-
-
-def test_split_amtstr():
-    assert split_amtstr("0g") == (0.0, "", "g")
-
-
-def _norm_amount(n: float, p: str) -> float:
-    if p == "d":
-        n *= 0.1
-    elif p == "c":
-        n *= 0.01
-    elif p == "m":
-        n *= 0.001
-    elif p in ["mc", "u", "μ"]:
-        n *= 0.000001
-    return n
-
-
-def _best_prefix(n: float) -> Tuple[str, float]:
-    if 1e-6 <= n < 1e-3:
-        return "u", 0.000001
-    elif 1e-3 <= n < 1e-0:
-        return "m", 0.001
-    # elif 1e-2 <= n < 1e-1:
-    #     return "c", 0.01
-    # elif 1e-1 <= n < 1e0:
-    #     return "d", 0.1
-    else:
-        return "", 1
-
-
-def _fmt_amount(amount: float, unit: str) -> str:
-    p, pf = _best_prefix(amount)
-    return f"{round(amount / pf, 4)}{p}{unit}"
+ureg = pint.UnitRegistry()
+ureg.define('micro- = 10**-6 = mc- = μ-')
+ureg.define('micro- = 10**-6 = mc- = μ-')
+Q_ = ureg.Quantity
 
 
 class Dose:
-    def __init__(self, substance: str, amount: str) -> None:
+    def __init__(self, substance: str, amount: Union[str, Q_]) -> None:
         self.substance: str = substance
-        n, p, u = split_amtstr(amount)
-        self.amount: float = _norm_amount(n, p)
-        self.unit: str = u
+        if isinstance(amount, ureg.Quantity):
+            self.quantity = amount
+        else:
+            self.quantity = Q_(amount)
+        self.quantity = self.quantity.to_base_units()
 
     def __str__(self) -> str:
         return f"{self.amount_with_unit} {self.substance}"
 
     @property
+    def amount(self) -> float:
+        return float(self.quantity.magnitude)
+
+    @property
+    def unit(self):
+        return self.quantity.units
+
+    @property
     def amount_with_unit(self) -> str:
-        return _fmt_amount(self.amount, self.unit)
+        q = self.quantity.to_compact()
+        # print(q)
+        amount = q.magnitude
+        amount = round(amount) if round(amount, 8) % 1.0 == 0 else amount
+        return f"{amount}{q.units:~P}"
+
+    def __repr__(self):
+        return f"<Dose {self}>"
 
     def __add__(self, other: "Dose") -> "Dose":
         assert self.substance.lower() == other.substance.lower()
-        try:
-            assert self.unit == other.unit
-        except AssertionError as e:
-            log.warning(f"Units were not equal: '{self.unit}' != '{other.unit}'")
-            raise e
-        return Dose(self.substance, _sum_amount(self.amount_with_unit, other.amount_with_unit))
+        return Dose(self.substance, self.quantity + other.quantity)
+
+    def __lt__(self, other):
+        return self.quantity < other.quantity
+
+    def __eq__(self, other):
+        return self.substance == other.substance and round((self.quantity - other.quantity).magnitude, 18) == 0
 
 
-def _sum_amount(a1: str, a2: str) -> str:
-    n1, p1, u1 = split_amtstr(a1)
-    n2, p2, u2 = split_amtstr(a2)
-    assert u1 == u2  # amounts have to have the same units
-    n = sum(_norm_amount(n, p) for n, p in ((n1, p1), (n2, p2)))
-    p, pf = _best_prefix(n)
-    n /= pf
-    return f"{n}{p}{u1}"
+def test_add_dose():
+    assert Dose("caffeine", "100mg") + Dose("caffeine", "100mg")
+
+    assert Dose("", "0g") + Dose("", "1g") == Dose("", "1.0g")
+    assert Dose("", "1mg") + Dose("", "10mg") == Dose("", "11.0mg")
+    assert Dose("", "500mcg") + Dose("", "1mg") == Dose("", "1.5mg")
+    assert Dose("", "100mcg") + Dose("", "100ug") == Dose("", "200.0ug")
+    assert Dose("", "100mcg") + Dose("", "100μg") == Dose("", "200.0ug")
+
+    assert Dose("", "1ml") + Dose("", "2ml") == Dose("", "3.0ml")
+    assert Dose("", "1dl") + Dose("", "4dl") == Dose("", "500.0ml")
+    assert Dose("", "1.0dl") + Dose("", "0l") == Dose("", "100.0ml")
+
+    assert Dose("", "33cl") + Dose("", "1l") == Dose("", "1.33l")
 
 
-def test_sum_amount():
-    assert _sum_amount("0g", "1g") == "1.0g"
-    assert _sum_amount("1mg", "10mg") == "11.0mg"
-    assert _sum_amount("500mcg", "1mg") == "1.5mg"
-    assert _sum_amount("100mcg", "100ug") == "200.0ug"
-    assert _sum_amount("100mcg", "100μg") == "200.0ug"
+def test_dose_format():
+    d = Dose("Caffeine", "0.1g")
+    assert str(d) == "100mg Caffeine"
 
-    assert _sum_amount("1ml", "2ml") == "3.0ml"
-    assert _sum_amount("1dl", "4dl") == "500.0ml"
-    assert _sum_amount("1.0dl", "0l") == "100.0ml"
-
-    assert _sum_amount("33cl", "1l") == "1.33l"
+    d = Dose("Potent stuff", "100mcg")
+    assert str(d) == "100mcg Potent stuff"

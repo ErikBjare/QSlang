@@ -1,16 +1,16 @@
 run:
-	python3 main.py
+	pipenv run python3 main.py
 
 test:
-	python3 -m pytest *.py
+	pipenv run python3 -m pytest *.py
 
 test-integration:
-	python3 main.py doses Noopept
-	python3 main.py plot Noopept
-	python3 main.py events
+	pipenv run python3 main.py doses Noopept
+	pipenv run python3 main.py plot Noopept
+	pipenv run python3 main.py events
 
 typecheck:
-	python3 -m mypy --ignore-missing-import *.py
+	pipenv run python3 -m mypy --ignore-missing-import *.py
 
 data/private/Evernote:
 	cd thirdparty/evernote-dump/source/ && \
