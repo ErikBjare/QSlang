@@ -11,6 +11,7 @@ from itertools import groupby
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 
 from event import Event
 from load import load_events
@@ -210,6 +211,30 @@ def _plot_frequency(events, count=False, one_per_day=False, any_substance=False,
     plt.show()
 
 
+def _plot_calendar(events):
+    import calmap
+
+    # Filter away journal entries and sort
+    events = list(sorted(filter(lambda e: e.type == "data", events)))
+
+    for e in events:
+        e.data["substance"] = "Any"
+
+    period_counts = _count_doses(events, one_per_day=True, monthly=False)
+    assert len(period_counts) == 1
+
+    doses = [n_dose for n_dose in next(iter(period_counts.values())).values()]
+    labels = [pd.Timestamp("-".join(map(str, date))) for sd in period_counts for date in period_counts[sd].keys()]
+
+    series = pd.Series(doses, index=labels)
+    series = series[~series.index.duplicated()]
+    series = series.resample('D').sum().asfreq('D')
+    print(series.tail(20))
+
+    calmap.calendarplot(series, fillcolor='grey', linewidth=1)
+    plt.show()
+
+
 def filter_events_by_args(events: List[Event], args: List[str]):
     if not args:
         print("Missing argument")
@@ -243,8 +268,9 @@ def _build_argparser():
     substances = subparsers.add_parser('substances', help='list substances')
     doses = subparsers.add_parser('doses', help='print information about doses')
     plot = subparsers.add_parser('plot', help='plot doses over time')
+    calendar = subparsers.add_parser('calendar', help='plot doses over time using a calendar')
 
-    for subparser in [events, substances, doses, plot]:
+    for subparser in [events, substances, doses, plot, calendar]:
         subparser.add_argument('substances', nargs='*', help='substances or #tags to include')
 
     plot.add_argument('--any', action='store_true', help='count all matches as any match')
@@ -318,6 +344,8 @@ def main():
         _print_substancelist(events)
     elif args.subcommand == "plot":
         _plot_frequency(events, count=args.count or args.days, one_per_day=args.days, daily=args.daily, any_substance=args.any)
+    elif args.subcommand == "calendar":
+        _plot_calendar(events)
     else:
         parser.print_help()
 
