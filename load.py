@@ -19,7 +19,7 @@ re_evernote_source = re.compile(r'>source:(.+)$')
 def _load_standard_notes() -> List[str]:
     notes = []
     p = Path("./data/private")
-    for path in p.glob("*Archive*.txt"):
+    for path in p.glob("Standard Notes Decrypted Backup*.txt"):
         with open(path) as f:
             data = json.load(f)
             for entry in sorted(data["items"], key=lambda e: e["content"]["title"] if "title" in e["content"] else ""):
