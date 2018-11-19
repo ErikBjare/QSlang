@@ -38,7 +38,7 @@ def dayrange(min_date: Tuple[int, int, int], max_date: Tuple[int, int, int]):
     months = monthrange(min_date[:2], max_date[:2])
     return [(y, m, d)
             for y, m in months
-            for d in range(1, days_in_month(y, m))
+            for d in range(1, days_in_month(y, m) + 1)
             if min_date <= (y, m, d) <= max_date]
 
 
