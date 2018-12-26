@@ -1,3 +1,4 @@
 data/private
 .*cache
 __pycache__
+config.toml

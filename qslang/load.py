@@ -5,9 +5,11 @@ import logging
 import json
 from typing import List, Dict
 from pathlib import Path
+from collections import defaultdict
 
 from .event import Event
 from .parse import parse, re_date
+from .config import load_config
 
 
 log = logging.getLogger(__name__)
@@ -83,31 +85,33 @@ def load_events() -> List[Event]:
     return sorted(events)
 
 
-def _load_substance_categories() -> Dict[str, List[str]]:
-    # TODO: Support more than one category per substance
-    p = Path("data/substance_categories.csv")
-    if p.is_file():
-        with p.open() as f:
-            lines = f.readlines()
-            return dict((line.split(",")[0].lower(), [line.split(",")[1].strip()]) for line in lines)
-    else:
-        return {}
+def _load_categories() -> Dict[str, List[str]]:
+    "Returns a dict {category: [substances...]}"
+    config = load_config()
+    categories = config.get('categories', {})
+    for cat in categories:
+        categories[cat] = [sub.lower() for sub in categories[cat]]
+    return categories
 
 
-substance_categories = _load_substance_categories()
+def _substance2categories():
+    "returns the inverted dict of _load_categories"
+    sub2cat = defaultdict(set)
+    for cat, subs in _load_categories().items():
+        for sub in subs:
+            sub2cat[sub].add(cat)
+    return sub2cat
 
 
-def _load_substance_map():
-    p = Path("data/substance_map.csv")
-    if p.is_file():
-        with p.open() as f:
-            lines = f.readlines()
-            return dict((line.split(",")[0].lower(), line.split(",")[1].strip()) for line in lines)
-    else:
-        return {}
+substance_categories = _substance2categories()
 
 
-substance_map = _load_substance_map()
+def _load_substance_aliases():
+    config = load_config()
+    return config.get('aliases', {})
+
+
+substance_aliases = _load_substance_aliases()
 
 
 def _tag_substances(events: List[Event]) -> List[Event]:
@@ -122,8 +126,8 @@ def _tag_substances(events: List[Event]) -> List[Event]:
 
 def _extend_substance_abbrs(events) -> List[Event]:
     for e in events:
-        if e.substance and e.substance.lower() in substance_map:
-            e.data["substance"] = substance_map[e.substance.lower()]
+        if e.substance and e.substance.lower() in substance_aliases:
+            e.data["substance"] = substance_aliases[e.substance.lower()]
     return events
 
 

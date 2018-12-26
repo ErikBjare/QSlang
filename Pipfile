@@ -9,7 +9,8 @@ matplotlib = "*"
 pandas = "*"
 calmap = "*"
 pint = "*"
-"calmap-0-0-7" = {editable = true, git = "https://github.com/MarvinT/calmap.git"}
+calmap-0-0-7 = {editable = true,git = "https://github.com/MarvinT/calmap.git"}
+toml = "*"
 
 [dev-packages]
 pytest = "*"
