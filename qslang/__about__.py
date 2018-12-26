@@ -1,0 +1,5 @@
+__title__ = "QSlang"
+__version__ = "0.1"
+__author__ = "Erik Bjäreholt"
+__email__ = "erik@bjareho.lt"
+__uri__ = "https://github.com/ErikBjare/QSlang"
