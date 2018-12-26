@@ -6,8 +6,8 @@ import json
 from typing import List, Dict
 from pathlib import Path
 
-from event import Event
-from parse import parse, re_date
+from .event import Event
+from .parse import parse, re_date
 
 
 log = logging.getLogger(__name__)

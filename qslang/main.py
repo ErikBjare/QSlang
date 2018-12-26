@@ -13,11 +13,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from event import Event
-from load import load_events
-from dose import Dose
-from util import MsgCounterHandler, monthrange, dayrange
-from igroupby import igroupby
+from .event import Event
+from .load import load_events
+from .dose import Dose
+from .util import MsgCounterHandler, monthrange, dayrange
+from .igroupby import igroupby
 
 
 log = logging.getLogger(__name__)

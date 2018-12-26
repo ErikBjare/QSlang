@@ -7,7 +7,7 @@ from datetime import datetime
 
 from dataclasses import dataclass, field
 
-from dose import Dose
+from .dose import Dose
 
 
 log = logging.getLogger(__name__)

@@ -6,7 +6,7 @@ import typing
 from typing import List, Dict, Any, Tuple, Optional
 from datetime import time, datetime, timedelta
 
-from event import Event
+from .event import Event
 
 
 log = logging.getLogger(__name__)
