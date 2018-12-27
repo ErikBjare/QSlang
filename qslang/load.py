@@ -1,5 +1,6 @@
 #!/bin/env python3
 
+import os
 import re
 import logging
 import json
@@ -18,10 +19,14 @@ re_evernote_author = re.compile(r'>author:(.+)$')
 re_evernote_source = re.compile(r'>source:(.+)$')
 
 
+base_dir = os.path.dirname(__file__)
+
+
 def _load_standard_notes() -> List[str]:
     notes = []
-    p = Path("./data/private")
+    p = Path(os.path.dirname(base_dir) + "/data/private")
     for path in p.glob("Standard Notes Decrypted Backup*.txt"):
+        print(f"Loading standardnotes from {path}")
         with open(path) as f:
             data = json.load(f)
             for entry in sorted(data["items"], key=lambda e: e["content"]["title"] if "title" in e["content"] else ""):

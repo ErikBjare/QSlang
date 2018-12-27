@@ -1,5 +1,6 @@
 __title__ = "QSlang"
 __version__ = "0.1"
+__summary__ = "A text-based language for manual entry of quantified self data"
 __author__ = "Erik Bjäreholt"
 __email__ = "erik@bjareho.lt"
 __uri__ = "https://github.com/ErikBjare/QSlang"

@@ -93,15 +93,6 @@ def _print_substancelist(events: List[Event]) -> None:
     print(f"{len(c)} substances found")
 
 
-def _print_usage() -> None:
-    print("Usage: python3 main.py <subcommand>")
-    print("Subcommands:")
-    print(" - events")
-    print(" - substances")
-    print(" - doses [substance or #tag]")
-    print(" - plot [substance or #tag]")
-
-
 TDate = Tuple[int, int, Optional[int]]
 
 
@@ -151,7 +142,7 @@ def _sum_doses(events: List[Event], monthly=True) -> Dict[str, TValueByDate]:
     return period_counts
 
 
-def _count_doses(events: List[Event], one_per_day=True, monthly=True) -> Dict[str, TValueByDate]:
+def _count_doses(events: List[Event], one_per_day=True, monthly=True, verbose=False) -> Dict[str, TValueByDate]:
     substances = {e.substance for e in events if e.substance}
     grouped_by_date = _grouped_by_date(events, monthly=monthly)
 
@@ -165,9 +156,10 @@ def _count_doses(events: List[Event], one_per_day=True, monthly=True) -> Dict[st
             c = Counter({substance: len(events) for substance, events in grouped_by_substance.items()})
         unit = " days" if one_per_day else "x"
 
-        print(period)
-        for k, v in c.most_common(20):
-            print(f" - {v}{unit} {k}")
+        if verbose:
+            print(period)
+            for k, v in c.most_common(20):
+                print(f" - {v}{unit} {k}")
 
         for s in substances:
             period_counts[s][period] = c[s]
@@ -211,7 +203,7 @@ def _plot_frequency(events, count=False, one_per_day=False, any_substance=False,
     plt.show()
 
 
-def _plot_calendar(events):
+def _plot_calendar(events, cmap='YlGn', fillcolor='#DDDDDDDD', **kwargs):
     import calmap
 
     # Filter away journal entries and sort
@@ -229,9 +221,9 @@ def _plot_calendar(events):
     series = pd.Series(doses, index=labels)
     series = series[~series.index.duplicated()]
     series = series.resample('D').sum().asfreq('D')
-    print(series.tail(20))
+    # print(series.tail(20))
 
-    calmap.calendarplot(series, fillcolor='grey', linewidth=1)
+    calmap.calendarplot(series, fillcolor=fillcolor, cmap=cmap, linewidth=1, fig_kws=kwargs)
     plt.show()
 
 
