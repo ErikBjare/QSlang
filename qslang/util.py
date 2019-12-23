@@ -40,13 +40,3 @@ def dayrange(min_date: Tuple[int, int, int], max_date: Tuple[int, int, int]):
             for y, m in months
             for d in range(1, days_in_month(y, m) + 1)
             if min_date <= (y, m, d) <= max_date]
-
-
-def test_monthrange():
-    months = monthrange((2017, 1), (2018, 4))
-    assert len(months) == 12 + 4
-
-
-def test_dayrange():
-    days = dayrange((2017, 12, 20), (2018, 2, 4))
-    assert len(days) == 10 + 31 + 4

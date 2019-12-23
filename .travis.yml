@@ -1,0 +1,19 @@
+os: linux
+dist: trusty
+language: python
+python: 3.7
+
+before_install:
+ # Upgrade pip and install pipenv
+ - python3 -m pip install --upgrade pip wheel pipenv;
+ # Print version used
+ - python3 --version
+ - pip3 --version
+
+install:
+ - pipenv install --dev
+ - pip install .
+
+script:
+ - "make test"
+ - "make typecheck"

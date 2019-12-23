@@ -12,15 +12,87 @@ from itertools import groupby
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import click
 
-from .event import Event
-from .load import load_events
-from .dose import Dose
-from .util import MsgCounterHandler, monthrange, dayrange
-from .igroupby import igroupby
+from qslang.event import Event
+from qslang.load import load_events
+from qslang.dose import Dose
+from qslang.util import monthrange, dayrange
+from qslang.igroupby import igroupby
 
 
 log = logging.getLogger(__name__)
+
+
+@click.group()
+@click.option('-v', '--verbose', is_flag=True)
+def main(verbose):
+    logging.basicConfig(level=logging.DEBUG if verbose else logging.ERROR)
+
+
+def _load_events(start: datetime = None, end: datetime = None, substances: List[str] = []) -> List[Event]:
+    events = load_events()
+    events = _filter_events(events, start, end, substances)
+    events = _alcohol_preprocess(events)
+    return events
+
+
+@main.command()
+def events():
+    events = _load_events()
+    print_events(events)
+
+
+@main.command()
+@click.option('--start', type=click.DateTime(['%Y-%m-%d']), help='start date to filter events by')
+@click.option('--end', type=click.DateTime(['%Y-%m-%d']), help='end date to filter events by')
+@click.option('--substances', help='substances to filter by (comma-separated)')
+def doses(start: datetime, end: datetime, substances: Optional[str]):
+    substances_list = substances.split(",") if substances else []
+    events = _load_events(start, end, substances_list)
+    events = [e for e in events if e.substance]
+    if events:
+        for substance, substance_events in igroupby(events, lambda e: e.substance).items():
+            _print_daily_doses(substance_events, substance)
+    else:
+        print("No matching events found")
+
+
+@main.command()
+@click.option('--start', type=click.DateTime(['%Y-%m-%d']), help='start date to filter events by')
+@click.option('--end', type=click.DateTime(['%Y-%m-%d']), help='end date to filter events by')
+@click.option('--substances', help='substances to filter by (comma-separated)')
+def substances(start, end, substances) -> None:
+    substances_list = substances.split(",") if substances else []
+    events = _load_events(start, end, substances_list)
+    c = Counter({k: len(v) for k, v in igroupby([e for e in events if e.substance], lambda e: e.substance).items()})
+    for s, n in c.most_common():
+        print(f"{n}x\t{s}")
+    print(f"{len(c)} substances found")
+
+
+@main.command()
+@click.option('--start', type=click.DateTime(['%Y-%m-%d']), help='start date to filter events by')
+@click.option('--end', type=click.DateTime(['%Y-%m-%d']), help='end date to filter events by')
+@click.option('--substances', help='substances to filter by (comma-separated)')
+@click.option('--any', is_flag=True, help='count all matches as any match')
+@click.option('--daily', is_flag=True, help='use daily resolution on the x-axis')
+@click.option('--count', is_flag=True, help='count number of doses instead of amount')
+@click.option('--days', is_flag=True, help='count number of days with doses')
+def plot(start: Optional[datetime], end: Optional[datetime], substances: str, any: bool, daily: bool, count: bool, days: bool):
+    substances_list = substances.split(",") if substances else []
+    events = _load_events(start, end, substances_list)
+    _plot_frequency(events, count=count or days, one_per_day=days, daily=daily, any_substance=any)
+
+
+@main.command()
+@click.option('--start', type=click.DateTime(['%Y-%m-%d']), help='start date to filter events by')
+@click.option('--end', type=click.DateTime(['%Y-%m-%d']), help='end date to filter events by')
+@click.option('--substances', help='substances to filter by (comma-separated)')
+def plot_calendar(start: Optional[datetime], end: Optional[datetime], substances: str):
+    substances_list = substances.split(",") if substances else []
+    events = _load_events(start, end, substances_list)
+    _plot_calendar(events)
 
 
 def print_event(e: Event, show_misc=False) -> None:
@@ -86,22 +158,16 @@ def _print_daily_doses(events: List[Event], substance: str, ignore_doses_fewer_t
         print(f"   - {roa.ljust(10)}  n: {len(grouped_by_roa[roa])}")
 
 
-def _print_substancelist(events: List[Event]) -> None:
-    c = Counter({k: len(v) for k, v in igroupby([e for e in events if e.substance], lambda e: e.substance).items()})
-    for s, n in c.most_common():
-        print(f"{n}x\t{s}")
-    print(f"{len(c)} substances found")
-
-
 TDate = Tuple[int, int, Optional[int]]
 
+day_offset = timedelta(hours=-4)
 
-def _grouped_by_date(events: List[Event], monthly=True, offset=True) -> Dict[TDate, List[Event]]:
+
+def _grouped_by_date(events: List[Event], monthly=True) -> Dict[TDate, List[Event]]:
     grouped_by_date: Dict[Tuple[int, int, Optional[int]], List[Event]] = defaultdict(list)
-    offset = timedelta(hours=6) if offset else timedelta(0)
     for period, events_grouped in groupby(events, key=lambda e: (
-            (e.timestamp + offset).year, (e.timestamp + offset).month, None
-            if monthly else (e.timestamp + offset).day)):
+            (e.timestamp + day_offset).year, (e.timestamp + day_offset).month, None
+            if monthly else (e.timestamp + day_offset).day)):
         grouped_by_date[period] = list(events_grouped)
     return grouped_by_date
 
@@ -151,7 +217,7 @@ def _count_doses(events: List[Event], one_per_day=True, monthly=True, verbose=Fa
         events = grouped_by_date[period]
         grouped_by_substance = igroupby(events, key=lambda e: e.substance)
         if one_per_day:
-            c = Counter({substance: len({e.timestamp.date() for e in events}) for substance, events in grouped_by_substance.items()})
+            c = Counter({substance: len({(e.timestamp + day_offset).date() for e in events}) for substance, events in grouped_by_substance.items()})
         else:
             c = Counter({substance: len(events) for substance, events in grouped_by_substance.items()})
         unit = " days" if one_per_day else "x"
@@ -167,7 +233,7 @@ def _count_doses(events: List[Event], one_per_day=True, monthly=True, verbose=Fa
     return period_counts
 
 
-def _plot_frequency(events, count=False, one_per_day=False, any_substance=False, daily=False):
+def _plot_frequency(events, count=False, one_per_day=False, any_substance=False, daily=False, verbose=False):
     """
     Should plot frequency of use over time
     (i.e. a barchart where the bar heights are equal to the count per period)
@@ -180,8 +246,8 @@ def _plot_frequency(events, count=False, one_per_day=False, any_substance=False,
         for e in events:
             e.data["substance"] = "Any"
 
-    if count:
-        period_counts = _count_doses(events, one_per_day=one_per_day, monthly=not daily)
+    if count or one_per_day:
+        period_counts = _count_doses(events, one_per_day=one_per_day, monthly=not daily, verbose=verbose)
     else:
         period_counts = _sum_doses(events, monthly=not daily)
 
@@ -203,7 +269,7 @@ def _plot_frequency(events, count=False, one_per_day=False, any_substance=False,
     plt.show()
 
 
-def _plot_calendar(events, cmap='YlGn', fillcolor='#DDDDDDDD', **kwargs):
+def _plot_calendar(events, cmap='Reds', fillcolor='whitesmoke', **kwargs):
     import calmap
 
     # Filter away journal entries and sort
@@ -246,34 +312,7 @@ def _datetime_arg(s):
     return d
 
 
-def _build_argparser():
-    import argparse
-
-    parser = argparse.ArgumentParser(prog='PROG')
-    parser.add_argument('-v', '--verbose', action='store_true', help='print verbose logging')
-    parser.add_argument('--start', type=_datetime_arg, help='start date to filter events by')
-    parser.add_argument('--end', type=_datetime_arg, help='end date to filter events by')
-
-    subparsers = parser.add_subparsers(dest='subcommand')
-
-    events = subparsers.add_parser('events', help='list events')
-    substances = subparsers.add_parser('substances', help='list substances')
-    doses = subparsers.add_parser('doses', help='print information about doses')
-    plot = subparsers.add_parser('plot', help='plot doses over time')
-    calendar = subparsers.add_parser('calendar', help='plot doses over time using a calendar')
-
-    for subparser in [events, substances, doses, plot, calendar]:
-        subparser.add_argument('substances', nargs='*', help='substances or #tags to include')
-
-    plot.add_argument('--any', action='store_true', help='count all matches as any match')
-    plot.add_argument('--daily', action='store_true', help='use daily resolution on the x-axis')
-    plot.add_argument('--count', action='store_true', help='count number of doses instead of amount')
-    plot.add_argument('--days', action='store_true', help='count number of days with doses')
-
-    return parser
-
-
-def _filter_events(events, start, end, substances):
+def _filter_events(events, start=None, end=None, substances=[]):
     if start:
         events = [e for e in events if e.timestamp >= start]
     if end:
@@ -309,40 +348,6 @@ def _alcohol_preprocess(events: List[Event]) -> List[Event]:
             e.data["substance"] = "Alcohol"
             e.data["amount"] = str(e.dose.quantity * conc)
     return events
-
-
-def main():
-    msgcounter = MsgCounterHandler()
-
-    parser = _build_argparser()
-    args = parser.parse_args()
-
-    logging.basicConfig(level=logging.DEBUG if args.verbose else logging.ERROR)
-    logging.getLogger().addHandler(msgcounter)
-
-    events = load_events()
-    events = _filter_events(events, args.start, args.end, args.substances)
-    events = _alcohol_preprocess(events)
-
-    if args.subcommand == "events":
-        print_events(events)
-    elif args.subcommand == "doses":
-        if events:
-            for substance, substance_events in igroupby(events, lambda e: e.substance).items():
-                _print_daily_doses(substance_events, substance)
-        else:
-            print("No matching events found")
-    elif args.subcommand == "substances":
-        _print_substancelist(events)
-    elif args.subcommand == "plot":
-        _plot_frequency(events, count=args.count or args.days, one_per_day=args.days, daily=args.daily, any_substance=args.any)
-    elif args.subcommand == "calendar":
-        _plot_calendar(events)
-    else:
-        parser.print_help()
-
-    if msgcounter.level2count:
-        print(f'Messages logged: {dict(msgcounter.level2count)}')
 
 
 if __name__ == "__main__":

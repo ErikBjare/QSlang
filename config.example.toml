@@ -1,0 +1,9 @@
+[categories]
+stimulants = ["Caffeine", "Modafinil"]
+sleepaids = ["Melatonin", "5-HTP", "Magnesium", "L-Theanine"]  # Gentle sleep aids
+
+[aliases]
+"Creatine monohydrate" = ["Creatine"]
+
+[data]
+standardnotes = "/home/user/Backup/Standard Notes/"

@@ -45,6 +45,25 @@ def _load_standard_notes() -> List[str]:
     return notes
 
 
+def _load_standardnotes_fs() -> List[str]:
+    notes = []
+    p = Path("/home/erb/notes")
+    for path in p.glob("*.txt"):
+        title = path.name.split(".")[0]
+        if re_date.match(title):
+            with open(path, 'r') as f:
+                text = f.read()
+                # print(title)
+                # print(text)
+                notes.append(f"# {title}\n\n{text}")
+        else:
+            log.debug("Unknown note type")
+            # print(entry["content"])
+
+    assert notes
+    return notes
+
+
 def _load_evernote() -> List[str]:
     notes = []
     d = Path("./data/private/Evernote")
@@ -81,7 +100,7 @@ def _load_evernote() -> List[str]:
 
 def load_events() -> List[Event]:
     events: List[Event] = []
-    for note in _load_standard_notes():
+    for note in _load_standardnotes_fs():
         events += parse(note)
     for note in _load_evernote():
         events += parse(note)

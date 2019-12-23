@@ -2,7 +2,7 @@ run:
 	pipenv run python3 main.py
 
 test:
-	pipenv run python3 -m pytest *.py
+	pipenv run python3 -m pytest tests/*.py
 
 test-integration:
 	pipenv run python3 main.py doses Noopept
@@ -12,7 +12,7 @@ test-integration:
 	pipenv run python3 main.py plot --days Noopept
 
 typecheck:
-	pipenv run python3 -m mypy --ignore-missing-import *.py
+	pipenv run python3 -m mypy --ignore-missing-import qslang/*.py tests/*.py
 
 data/private/Evernote:
 	cd thirdparty/evernote-dump/source/ && \
