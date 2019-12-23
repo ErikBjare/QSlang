@@ -3,21 +3,26 @@ qslang
 
 A text-based language for manual entry of quantified self data.
 
-Useful for logging in an textual format which can be very flexible and allow for interleaving of partially structured data to later be structured. It can even be pretty efficient in combination with word-predicting keyboards on touch devices.
+Useful for logging in a flexible textual format which allows for interleaving of partially structured data to later be structured. Input on touch devices is surprisingly efficient in combination with sentence-predicting keyboards.
+
+Pronounced: Q-Slang
 
 Usage
 =====
 
 This repo contains tools to import from:
 
- - Standard Notes
+ - Directory with plaintext-files (as created by [standardnotes-fs](https://github.com/tannercollin/standardnotes-fs))
  - Evernote
+ - Standard Notes export (deprecated)
 
-For Standard Notes, create an unencrypted export and unzip the `SN Archive.txt` file into `./data/private` (keep its default name). 
+For directory/standardnotes: Put your notes in `~/notes` or use standardnotes-fs to mount to the same directory.
+
+For Standard Notes exports: create an unencrypted export and unzip the `SN Archive.txt` file into `./data/private` (keep its default name). 
 
 For Evernote, export the notebooks you want to analyze as `.enex` file. Then put all the exported notebooks you want into `./data/private`. Then run `make data/private/Evernote` to extract the .enex into markdown files (which will be put into `data/private/Evernote/`).
 
-Then simply run `./main.py` to get further usage instructions.
+Then run `python3 -m qslang --help` to get further usage instructions.
 
 Input format
 ============
