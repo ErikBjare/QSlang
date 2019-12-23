@@ -13,7 +13,7 @@ from .parse import parse, re_date
 from .config import load_config
 
 
-log = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 re_evernote_author = re.compile(r'>author:(.+)$')
 re_evernote_source = re.compile(r'>source:(.+)$')
@@ -38,7 +38,7 @@ def _load_standard_notes() -> List[str]:
                         # print(text)
                         notes.append(f"# {title}\n\n{text}")
                 else:
-                    log.debug("Unknown note type")
+                    logger.debug("Unknown note type")
                     # print(entry["content"])
                     title = None
 
@@ -57,7 +57,7 @@ def _load_standardnotes_fs() -> List[str]:
                 # print(text)
                 notes.append(f"# {title}\n\n{text}")
         else:
-            log.debug("Unknown note type")
+            logger.debug("Unknown note type")
             # print(entry["content"])
 
     assert notes
@@ -144,7 +144,7 @@ def _tag_substances(events: List[Event]) -> List[Event]:
             cats = substance_categories[e.substance.lower()]
             e.data["tags"] = cats
     n_categorized = len([e for e in events if e.tags])
-    print(f"Categorized {n_categorized} out {len(events)} of events ({round(n_categorized/len(events)*100, 1)}%)")
+    logger.info(f"Categorized {n_categorized} out of {len(events)} events ({round(n_categorized/len(events)*100, 1)}%)")
     return events
 
 

@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import click
+import pint
 
 from qslang.event import Event
 from qslang.load import load_events
@@ -21,13 +22,13 @@ from qslang.util import monthrange, dayrange
 from qslang.igroupby import igroupby
 
 
-log = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 
 @click.group()
 @click.option('-v', '--verbose', is_flag=True)
 def main(verbose):
-    logging.basicConfig(level=logging.DEBUG if verbose else logging.ERROR)
+    logging.basicConfig(level=logging.DEBUG if verbose else logging.WARN)
 
 
 def _load_events(start: datetime = None, end: datetime = None, substances: List[str] = []) -> List[Event]:
@@ -135,11 +136,7 @@ def _print_daily_doses(events: List[Event], substance: str, ignore_doses_fewer_t
                     amt += e.dose
             tot_amt += amt
         except Exception as e:
-            log.warning(f"Unable to sum amounts '{v}', '{tot_amt}': {e}")
-
-    median_dose = statistics.median(e.dose for e in events if e.dose)  # type: ignore
-    min_dose = min(e.dose for e in events if e.dose)
-    max_dose = max(e.dose for e in events if e.dose)
+            logger.warning(f"Unable to sum amounts '{v}', '{tot_amt}': {e}")
 
     if ignore_doses_fewer_than and ignore_doses_fewer_than > len(grouped_by_date):
         return
@@ -151,7 +148,14 @@ def _print_daily_doses(events: List[Event], substance: str, ignore_doses_fewer_t
     print(f" - oldest: {min(grouped_by_date)} ({(date.today() - min(grouped_by_date)).days} days ago)")
     print(f" - {len(grouped_by_date)} days totalling {tot_amt.amount_with_unit}")
     print(f" - avg dose/day: {tot_amt/len(events)}")
-    print(f" - min/median/max dose: {min_dose.amount_with_unit}/{median_dose.amount_with_unit}/{max_dose.amount_with_unit}")
+
+    try:
+        median_dose = statistics.median(e.dose for e in events if e.dose)  # type: ignore
+        min_dose = min(e.dose for e in events if e.dose)
+        max_dose = max(e.dose for e in events if e.dose)
+        print(f" - min/median/max dose: {min_dose.amount_with_unit}/{median_dose.amount_with_unit}/{max_dose.amount_with_unit}")
+    except pint.errors.DimensionalityError:
+        logger.warning("Couldn't compute min/median/max doses due to inconsistent units")
     grouped_by_roa = igroupby(events, key=lambda e: e.roa)
     print(f" - ROAs:")
     for roa in sorted(grouped_by_roa, key=lambda v: grouped_by_roa[v]):
