@@ -39,8 +39,10 @@ def _load_events(start: datetime = None, end: datetime = None, substances: List[
 
 
 @main.command()
-def events():
-    events = _load_events()
+@click.option('--start', type=click.DateTime(['%Y-%m-%d']), help='start date to filter events by')
+@click.option('--end', type=click.DateTime(['%Y-%m-%d']), help='end date to filter events by')
+def events(start: datetime, end: datetime):
+    events = _load_events(start, end)
     print_events(events)
 
 
@@ -114,8 +116,12 @@ def print_event(e: Event, show_misc=False) -> None:
 
 
 def print_events(events: List[Event]) -> None:
+    last_date: Optional[datetime] = None
     for e in events:
+        if last_date and last_date.date() != e.timestamp.date():
+            print(f"{str(last_date.date()).ljust(8)} =========|=========|====== New day =====")
         print_event(e)
+        last_date = e.timestamp
 
 
 def _print_daily_doses(events: List[Event], substance: str, ignore_doses_fewer_than=None):

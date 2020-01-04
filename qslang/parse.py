@@ -97,17 +97,19 @@ def parse(text: str) -> List[Event]:
     events = []  # type: List[Event]
 
     current_date = None
-    for line in text.split("\n"):
+    lines = text.split("\n")
+    for line in lines:
         line = line.strip()
         if line:
             if line[0] == "#":
                 try:
                     current_date = datetime.strptime(line[1:].strip().split(" - ")[0], "%Y-%m-%d")
                 except Exception as e:
-                    log.debug(f"Unable to parse date: {e}")
+                    log.warning(f"Unable to parse date: {e}")
             elif re_time.match(line):
                 if not current_date:
-                    log.warning("Date unknown, skipping")
+                    log.warning(f"Date unknown ('{line}'), skipping")
+                    log.warning(f"First line was: '{lines[0]}'")
                     continue
 
                 try:
