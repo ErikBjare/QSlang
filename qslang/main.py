@@ -41,8 +41,10 @@ def _load_events(start: datetime = None, end: datetime = None, substances: List[
 @main.command()
 @click.option('--start', type=click.DateTime(['%Y-%m-%d']), help='start date to filter events by')
 @click.option('--end', type=click.DateTime(['%Y-%m-%d']), help='end date to filter events by')
-def events(start: datetime, end: datetime):
-    events = _load_events(start, end)
+@click.option('--substances', help='substances to filter by (comma-separated)')
+def events(start: datetime, end: datetime, substances: Optional[str]):
+    substances_list = substances.split(",") if substances else []
+    events = _load_events(start, end, substances_list)
     print_events(events)
 
 

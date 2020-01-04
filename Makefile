@@ -1,18 +1,18 @@
 run:
-	pipenv run python3 main.py
+	python3 main.py
 
 test:
-	pipenv run python3 -m pytest tests/*.py
+	pytest tests/*.py
 
 test-integration:
-	pipenv run python3 main.py doses Noopept
-	pipenv run python3 main.py events
-	pipenv run python3 main.py plot Noopept
-	pipenv run python3 main.py plot --count Noopept
-	pipenv run python3 main.py plot --days Noopept
+	qslang doses --substances Noopept
+	qslang events --substances Noopept
+	qslang plot --substances Noopept
+	qslang plot --count --substances Noopept
+	qslang plot --days --substances Noopept
 
 typecheck:
-	pipenv run python3 -m mypy --ignore-missing-import qslang/*.py tests/*.py
+	mypy --ignore-missing-import qslang/*.py tests/*.py
 
 data/private/Evernote:
 	cd thirdparty/evernote-dump/source/ && \
