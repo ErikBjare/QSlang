@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 @click.group()
 @click.option('-v', '--verbose', is_flag=True)
-def main(verbose):
+def qslang(verbose):
     logging.basicConfig(level=logging.DEBUG if verbose else logging.WARN)
 
 
@@ -38,7 +38,7 @@ def _load_events(start: datetime = None, end: datetime = None, substances: List[
     return events
 
 
-@main.command()
+@qslang.command()
 @click.option('--start', type=click.DateTime(['%Y-%m-%d']), help='start date to filter events by')
 @click.option('--end', type=click.DateTime(['%Y-%m-%d']), help='end date to filter events by')
 @click.option('--substances', help='substances to filter by (comma-separated)')
@@ -48,7 +48,7 @@ def events(start: datetime, end: datetime, substances: Optional[str]):
     print_events(events)
 
 
-@main.command()
+@qslang.command()
 @click.option('--start', type=click.DateTime(['%Y-%m-%d']), help='start date to filter events by')
 @click.option('--end', type=click.DateTime(['%Y-%m-%d']), help='end date to filter events by')
 @click.option('--substances', help='substances to filter by (comma-separated)')
@@ -63,7 +63,7 @@ def doses(start: datetime, end: datetime, substances: Optional[str]):
         print("No matching events found")
 
 
-@main.command()
+@qslang.command()
 @click.option('--start', type=click.DateTime(['%Y-%m-%d']), help='start date to filter events by')
 @click.option('--end', type=click.DateTime(['%Y-%m-%d']), help='end date to filter events by')
 @click.option('--substances', help='substances to filter by (comma-separated)')
@@ -76,7 +76,7 @@ def substances(start, end, substances) -> None:
     print(f"{len(c)} substances found")
 
 
-@main.command()
+@qslang.command()
 @click.option('--start', type=click.DateTime(['%Y-%m-%d']), help='start date to filter events by')
 @click.option('--end', type=click.DateTime(['%Y-%m-%d']), help='end date to filter events by')
 @click.option('--substances', help='substances to filter by (comma-separated)')
@@ -90,7 +90,7 @@ def plot(start: Optional[datetime], end: Optional[datetime], substances: str, an
     _plot_frequency(events, count=count or days, one_per_day=days, daily=daily, any_substance=any)
 
 
-@main.command()
+@qslang.command()
 @click.option('--start', type=click.DateTime(['%Y-%m-%d']), help='start date to filter events by')
 @click.option('--end', type=click.DateTime(['%Y-%m-%d']), help='end date to filter events by')
 @click.option('--substances', help='substances to filter by (comma-separated)')
@@ -363,4 +363,4 @@ def _alcohol_preprocess(events: List[Event]) -> List[Event]:
 
 
 if __name__ == "__main__":
-    main()
+    qslang()
