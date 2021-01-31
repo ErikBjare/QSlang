@@ -22,7 +22,7 @@ tests_no_zope = ["coverage[toml] (>=5.0.2)", "hypothesis", "pympler", "pytest (>
 
 [[package]]
 name = "calmap"
-version = "0.0.7"
+version = "0.0.8"
 description = "Calendar heatmaps from Pandas time series data"
 category = "main"
 optional = false
@@ -348,7 +348,7 @@ testing = ["pytest (>=3.5,!=3.7.3)", "pytest-checkdocs (>=1.2.3)", "pytest-flake
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.7"
-content-hash = "49381185d7c72221483f0ca7d37c71d39f6c2c0befc2049f6f89360df421793d"
+content-hash = "d8bb9972dd73d2398c1c0a29429d5845c4e2a883661ba01db4e922858d95337d"
 
 [metadata.files]
 atomicwrites = [
@@ -360,8 +360,8 @@ attrs = [
     {file = "attrs-20.3.0.tar.gz", hash = "sha256:832aa3cde19744e49938b91fea06d69ecb9e649c93ba974535d08ad92164f700"},
 ]
 calmap = [
-    {file = "calmap-0.0.7-py2.py3-none-any.whl", hash = "sha256:cb9621e9613bf60ac22aa00c6b693723e39d8dca9f3af35f17871bda1eb2dd03"},
-    {file = "calmap-0.0.7.tar.gz", hash = "sha256:d5d44491027c4900cc88dd9c5404599c100528141f5a0b1eb671c5c93af26071"},
+    {file = "calmap-0.0.8-py2.py3-none-any.whl", hash = "sha256:d2c8e7d635056759abfb40ccef0004aaafecb15315af749845f37c8bb72be9d2"},
+    {file = "calmap-0.0.8.tar.gz", hash = "sha256:3faf08208a5b96a04d964b02c5138bd7ce7784752e382a40122b6abde77e5024"},
 ]
 click = [
     {file = "click-7.1.2-py2.py3-none-any.whl", hash = "sha256:dacca89f4bfadd5de3d7489b7c8a566eee0d3676333fbb50030263894c38c0dc"},
