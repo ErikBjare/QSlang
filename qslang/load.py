@@ -15,21 +15,25 @@ from .config import load_config
 
 logger = logging.getLogger(__name__)
 
-re_evernote_author = re.compile(r'>author:(.+)$')
-re_evernote_source = re.compile(r'>source:(.+)$')
+re_evernote_author = re.compile(r">author:(.+)$")
+re_evernote_source = re.compile(r">source:(.+)$")
 
 
 base_dir = os.path.dirname(__file__)
 
 
 def _load_standard_notes() -> List[str]:
+    # NOTE: Deprecated
     notes = []
     p = Path(os.path.dirname(base_dir) + "/data/private")
     for path in p.glob("Standard Notes Decrypted Backup*.txt"):
         print(f"Loading standardnotes from {path}")
         with open(path) as f:
             data = json.load(f)
-            for entry in sorted(data["items"], key=lambda e: e["content"]["title"] if "title" in e["content"] else ""):
+            for entry in sorted(
+                data["items"],
+                key=lambda e: e["content"]["title"] if "title" in e["content"] else "",
+            ):
                 if "title" in entry["content"] and "text" in entry["content"]:
                     title = entry["content"]["title"]
                     text = entry["content"]["text"]
@@ -51,7 +55,7 @@ def _load_standardnotes_fs() -> List[str]:
     for path in p.glob("*.txt"):
         title = path.name.split(".")[0]
         if re_date.match(title):
-            with open(path, 'r') as f:
+            with open(path, "r") as f:
                 text = f.read()
                 # print(title)
                 # print(text)
@@ -91,7 +95,15 @@ def _load_evernote() -> List[str]:
             dateset.add(dates[0])
 
             # Remove metadata lines
-            data = "\n".join(line for line in data.split("\n") if not (line.startswith(">") or line.startswith("---") or line.startswith("##")))
+            data = "\n".join(
+                line
+                for line in data.split("\n")
+                if not (
+                    line.startswith(">")
+                    or line.startswith("---")
+                    or line.startswith("##")
+                )
+            )
 
             notes.append(data)
     # pprint(sorted(dates))
@@ -112,7 +124,7 @@ def load_events() -> List[Event]:
 def _load_categories() -> Dict[str, List[str]]:
     "Returns a dict {category: [substances...]}"
     config = load_config()
-    categories = config.get('categories', {})
+    categories = config.get("categories", {})
     for cat in categories:
         categories[cat] = [sub.lower() for sub in categories[cat]]
     return categories
@@ -132,7 +144,7 @@ substance_categories = _substance2categories()
 
 def _load_substance_aliases():
     config = load_config()
-    return config.get('aliases', {})
+    return config.get("aliases", {})
 
 
 substance_aliases = _load_substance_aliases()
@@ -144,7 +156,9 @@ def _tag_substances(events: List[Event]) -> List[Event]:
             cats = substance_categories[e.substance.lower()]
             e.data["tags"] = cats
     n_categorized = len([e for e in events if e.tags])
-    logger.info(f"Categorized {n_categorized} out of {len(events)} events ({round(n_categorized/len(events)*100, 1)}%)")
+    logger.info(
+        f"Categorized {n_categorized} out of {len(events)} events ({round(n_categorized/len(events)*100, 1)}%)"
+    )
     return events
 
 
