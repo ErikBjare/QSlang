@@ -22,37 +22,48 @@ re_evernote_source = re.compile(r">source:(.+)$")
 base_dir = os.path.dirname(__file__)
 
 
-def _load_standard_notes() -> List[str]:
-    # NOTE: Deprecated
-    notes = []
-    p = Path(os.path.dirname(base_dir) + "/data/private")
-    for path in p.glob("Standard Notes Decrypted Backup*.txt"):
-        print(f"Loading standardnotes from {path}")
-        with open(path) as f:
-            data = json.load(f)
-            for entry in sorted(
-                data["items"],
-                key=lambda e: e["content"]["title"] if "title" in e["content"] else "",
-            ):
-                if "title" in entry["content"] and "text" in entry["content"]:
-                    title = entry["content"]["title"]
-                    text = entry["content"]["text"]
-                    if re_date.match(title):
-                        # print(title)
-                        # print(text)
-                        notes.append(f"# {title}\n\n{text}")
-                else:
-                    logger.debug("Unknown note type")
-                    # print(entry["content"])
-                    title = None
+def _get_export_file() -> Path:
+    config = load_config()
+    p = config.get("data", {}).get("standardnotes_export", None)
+    if p is None:
+        raise ValueError("no standardnotes export in config")
+    return Path(p)
 
+
+def _load_standardnotes_export() -> List[str]:
+    # NOTE: ~~Deprecated~~
+    # NOTE: No longer deprecated as standardnotes-fs isn't working as well as it used to (after the standardnotes 004 upgrade)
+
+    notes = []
+    path = _get_export_file()
+
+    print(f"Loading standardnotes from {path}")
+    with open(path) as f:
+        data = json.load(f)
+        for entry in sorted(
+            data["items"],
+            key=lambda e: e["content"]["title"] if "title" in e["content"] else "",
+        ):
+            if "title" in entry["content"] and "text" in entry["content"]:
+                title = entry["content"]["title"]
+                text = entry["content"]["text"]
+                if re_date.match(title):
+                    # print(title)
+                    # print(text)
+                    notes.append(f"# {title}\n\n{text}")
+            else:
+                logger.debug("Unknown note type")
+                # print(entry["content"])
+                title = None
+
+    assert notes
     return notes
 
 
 def _load_standardnotes_fs() -> List[str]:
     notes = []
-    p = Path("/home/erb/notes")
-    for path in p.glob("*.txt"):
+    p = Path("/home/erb/notes-git/notes")
+    for path in p.glob("*.md"):
         title = path.name.split(".")[0]
         if re_date.match(title):
             with open(path, "r") as f:
@@ -84,7 +95,7 @@ def _load_evernote() -> List[str]:
 
             source = re_evernote_source.findall(data)
             if not authors and not source:
-                print(f" - Skipping note without author or source")
+                print(" - Skipping note without author or source")
                 continue
 
             if source and "android" not in source[0]:
@@ -112,7 +123,7 @@ def _load_evernote() -> List[str]:
 
 def load_events() -> List[Event]:
     events: List[Event] = []
-    for note in _load_standardnotes_fs():
+    for note in _load_standardnotes_export():
         events += parse(note)
     for note in _load_evernote():
         events += parse(note)
