@@ -2,7 +2,7 @@ run:
 	python3 main.py
 
 test:
-	pytest tests/*.py
+	pytest qslang/filter.py tests/*.py
 
 test-integration:
 	qslang doses --substances Noopept
