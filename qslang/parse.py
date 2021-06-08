@@ -13,10 +13,14 @@ log = logging.getLogger(__name__)
 
 re_date = re.compile(r"[0-9]+-[0-9]+-[0-9]+")
 re_time = re.compile(r"[~+]*[0-9]{1,2}:[0-9]{1,2}")
-re_amount = re.compile(r"[~≤<>=]?[?0-9\.]+(?:k|c|d|mc|m|u|n)?(?:l|L|g|IU|x| ?tb?sp|(?= ))\b")
+re_amount = re.compile(
+    r"[~≤<>=]?[?0-9\.]+(?:k|c|d|mc|m|u|n)?(?:l|L|g|IU|x| ?tb?sp|(?= ))\b"
+)
 re_extra = re.compile(r"[(].*[)]")
 re_substance = re.compile(r"[-\w ]=")
-re_roa = re.compile(r"\b(oral(?:ly)?|subcut\w*|smoked|vap(?:ed|o?r?i?z?e?d?)|spliff|chewed|buccal(?:ly)?|subl(?:ingual)?|rectal(?:ly)?|insuff(?:lated)?|intranasal|IM|intramuscular|IV|intravenous|topical|transdermal|drinked|balloon)\b")
+re_roa = re.compile(
+    r"\b(oral(?:ly)?|subcut\w*|smoked|vap(?:ed|o?r?i?z?e?d?)|spliff|chewed|buccal(?:ly)?|subl(?:ingual)?|rectal(?:ly)?|insuff(?:lated)?|intranasal|IM|intramuscular|IV|intravenous|topical|transdermal|drinked|balloon)\b"
+)
 re_concentration = re.compile(r"[?0-9\.]+%")
 
 
@@ -42,7 +46,7 @@ def parse_data(data: str) -> List[Dict[str, Any]]:
     if re_amount.match(data):
         # regexp matches all plusses or commas not within parens or brackets
         # taken from: https://stackoverflow.com/a/26634150/965332
-        for entry in (e for e in re.split(r'[+,]\s*(?![^()]*\))', data)):
+        for entry in (e for e in re.split(r"[+,]\s*(?![^()]*\))", data)):
             d: Dict[str, Any] = {"raw": entry}
             entry, d["amount"] = _pop_regex(entry, re_amount)
             entry, d["roa"] = _pop_regex(entry, re_roa)
@@ -103,7 +107,9 @@ def parse(text: str) -> List[Event]:
         if line:
             if line[0] == "#":
                 try:
-                    current_date = datetime.strptime(line[1:].strip().split(" - ")[0], "%Y-%m-%d")
+                    current_date = datetime.strptime(
+                        line[1:].strip().split(" - ")[0], "%Y-%m-%d"
+                    )
                 except Exception as e:
                     log.warning(f"Unable to parse date: {e}")
             elif re_time.match(line):

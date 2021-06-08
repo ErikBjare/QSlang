@@ -1,8 +1,8 @@
 from typing import List, Dict, Callable, TypeVar, overload, no_type_check
 from itertools import groupby
 
-T = TypeVar('T')
-K = TypeVar('K')
+T = TypeVar("T")
+K = TypeVar("K")
 
 
 # Overload necessary here, see issue: https://github.com/python/mypy/issues/5464

@@ -41,7 +41,11 @@ class Event:
     @property
     def amount(self):
         # TODO: Move stripping of '~' etc into parsing and annotate meaning using tags?
-        return self.data["amount"].strip("~") if "amount" in self.data and "?" not in self.data["amount"] else None
+        return (
+            self.data["amount"].strip("~")
+            if "amount" in self.data and "?" not in self.data["amount"]
+            else None
+        )
 
     @property
     def roa(self):

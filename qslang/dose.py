@@ -9,8 +9,8 @@ log = logging.getLogger(__name__)
 
 
 ureg = pint.UnitRegistry()
-ureg.define('micro- = 10**-6 = mc- = μ-')
-ureg.define('micro- = 10**-6 = mc- = μ-')
+ureg.define("micro- = 10**-6 = mc- = μ-")
+ureg.define("micro- = 10**-6 = mc- = μ-")
 
 # The type here is because mypy doesn't like this dynamically created type
 Q_ = ureg.Quantity  # type: Any
@@ -49,4 +49,7 @@ class Dose:
         return self.quantity < other.quantity
 
     def __eq__(self, other):
-        return self.substance == other.substance and round((self.quantity - other.quantity).magnitude, 18) == 0
+        return (
+            self.substance == other.substance
+            and round((self.quantity - other.quantity).magnitude, 18) == 0
+        )
