@@ -2,7 +2,7 @@ run:
 	python3 main.py
 
 test:
-	pytest qslang/filter.py tests/*.py
+	poetry run pytest qslang/filter.py tests/*.py
 
 test-integration:
 	qslang doses --substances Noopept
@@ -12,7 +12,10 @@ test-integration:
 	qslang plot --days --substances Noopept
 
 typecheck:
-	mypy --ignore-missing-import qslang/*.py tests/*.py
+	poetry run mypy --ignore-missing-import qslang/*.py tests/*.py
+
+format:
+	poetry run black qslang tests
 
 data/private/Evernote:
 	cd thirdparty/evernote-dump/source/ && \
