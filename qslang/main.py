@@ -61,7 +61,7 @@ def events(start: datetime, end: datetime, substances: Optional[str]):
     "--end", type=click.DateTime(["%Y-%m-%d"]), help="end date to filter events by"
 )
 @click.option("--substances", help="substances to filter by (comma-separated)")
-def doses(start: datetime, end: datetime, substances: Optional[str]):
+def doses(start: datetime, end: datetime, substances: str):
     substances_list = substances.split(",") if substances else []
     events = _load_events(start, end, substances_list)
     events = [e for e in events if e.substance]
@@ -69,6 +69,7 @@ def doses(start: datetime, end: datetime, substances: Optional[str]):
         for substance, substance_events in igroupby(
             events, lambda e: e.substance
         ).items():
+            assert substance
             _print_daily_doses(substance_events, substance)
     else:
         print("No matching events found")
@@ -358,11 +359,15 @@ def _plot_frequency(
     else:
         period_counts = _sum_doses(events, monthly=not daily)
 
-    labels = [date for sd in period_counts for date in period_counts[sd].keys()]
+    labels: List[Tuple[int, int, int]] = [
+        date for sd in period_counts for date in period_counts[sd].keys()
+    ]
     if daily:
         labels = dayrange(min(labels), max(labels))
     else:
-        labels = [(*m, None) for m in monthrange(min(labels)[:2], max(labels)[:2])]
+        labels = [
+            (m[0], m[1], None) for m in monthrange(min(labels)[:2], max(labels)[:2])
+        ]
     labels_str = ["-".join([str(n) for n in t if n]) for t in labels]
 
     stackheight = np.zeros(len(labels))

@@ -3,7 +3,7 @@
 import logging
 import itertools
 import calendar
-from typing import Dict, Tuple
+from typing import Dict, Tuple, List
 from collections import defaultdict
 
 
@@ -27,7 +27,9 @@ def days_in_month(year, month):
     return max(list(calendar.Calendar().itermonthdays(year, month)))
 
 
-def monthrange(min_date: Tuple[int, int], max_date: Tuple[int, int]):
+def monthrange(
+    min_date: Tuple[int, int], max_date: Tuple[int, int]
+) -> List[Tuple[int, int]]:
     (min_year, min_month) = min_date
     (max_year, max_month) = max_date
     g = itertools.product(range(min_year, max_year + 1), range(1, 13))
@@ -35,7 +37,9 @@ def monthrange(min_date: Tuple[int, int], max_date: Tuple[int, int]):
     return list(itertools.takewhile(lambda t: t <= (max_year, max_month), g))
 
 
-def dayrange(min_date: Tuple[int, int, int], max_date: Tuple[int, int, int]):
+def dayrange(
+    min_date: Tuple[int, int, int], max_date: Tuple[int, int, int]
+) -> List[Tuple[int, int, int]]:
     months = monthrange(min_date[:2], max_date[:2])
     return [
         (y, m, d)
