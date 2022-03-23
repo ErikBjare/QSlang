@@ -1,6 +1,10 @@
 from qslang.dose import Dose
 
 
+def test_dose_eq():
+    assert Dose("", "100ml") == Dose("", "0.1l")
+
+
 def test_add_dose():
     assert Dose("caffeine", "100mg") + Dose("caffeine", "100mg")
 

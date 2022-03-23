@@ -19,10 +19,9 @@ Q_ = ureg.Quantity  # type: Any
 class Dose:
     def __init__(self, substance: str, amount: Union[str, Q_]) -> None:
         self.substance: str = substance
-        if isinstance(amount, ureg.Quantity):
-            self.quantity = amount
-        else:
-            self.quantity = Q_(amount)
+        if not isinstance(amount, ureg.Quantity):
+            amount = Q_(amount)
+        self.quantity = amount
 
     def __str__(self) -> str:
         return f"{self.amount_with_unit} {self.substance}"
@@ -51,5 +50,5 @@ class Dose:
     def __eq__(self, other):
         return (
             self.substance == other.substance
-            and round((self.quantity - other.quantity).magnitude, 18) == 0
+            and round((self.quantity - other.quantity).magnitude, 12) == 0
         )

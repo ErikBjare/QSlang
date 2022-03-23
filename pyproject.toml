@@ -27,6 +27,17 @@ mypy = "*"
 flake8 = "*"
 black = "*"
 
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "--cov=qslang --cov-report=xml --cov-report=html --cov-report=term" # --profile --cov-report=term 
+testpaths = [
+    "qslang",
+    "tests",
+]
+python_files = ["*.py",]
+filterwarnings = ["ignore::DeprecationWarning",]
+
+
 [build-system]
 requires = ["poetry>=0.12"]
 build-backend = "poetry.masonry.api"

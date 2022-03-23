@@ -3,3 +3,4 @@ data/private
 __pycache__
 config.toml
 *.egg-info
+*coverage*

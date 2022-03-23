@@ -1,3 +1,4 @@
 from qslang import main
 
-main.qslang()
+if __name__ == "__main__":
+    main.qslang()
