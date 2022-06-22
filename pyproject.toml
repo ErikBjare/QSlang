@@ -20,6 +20,7 @@ pint = "*"
 toml = "*"
 click = "*"
 calplot = "^0.1"  # fork of calmap
+aw-core = "*"
 
 [tool.poetry.dev-dependencies]
 pytest = "*"
@@ -29,7 +30,7 @@ black = "*"
 
 [tool.pytest.ini_options]
 minversion = "6.0"
-addopts = "--cov=qslang --cov-report=xml --cov-report=html --cov-report=term" # --profile --cov-report=term 
+addopts = "--cov=qslang --cov-report=xml --cov-report=html --cov-report=term" # --profile --cov-report=term
 testpaths = [
     "qslang",
     "tests",
