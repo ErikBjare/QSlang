@@ -2,10 +2,11 @@
 
 import logging
 import statistics
+import json
 from typing import List, Dict, Tuple, Optional
 from copy import copy
 from collections import Counter, defaultdict
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from itertools import groupby
 
 import matplotlib.pyplot as plt
@@ -71,6 +72,45 @@ def doses(start: datetime, end: datetime, substances: str):
         ).items():
             assert substance
             _print_daily_doses(substance_events, substance)
+    else:
+        print("No matching events found")
+
+
+@qslang.command()
+@click.option(
+    "--start", type=click.DateTime(["%Y-%m-%d"]), help="start date to filter events by"
+)
+@click.option(
+    "--end", type=click.DateTime(["%Y-%m-%d"]), help="end date to filter events by"
+)
+@click.option("--substances", help="substances to filter by (comma-separated)")
+def effectspan(start: datetime, end: datetime, substances: str):
+    substances_list = substances.split(",") if substances else []
+    events = _load_events(start, end, substances_list)
+    events = [e for e in events if e.substance]
+    if events:
+        from .pharmacokinetics import effectspan
+
+        effectspans = effectspan(
+            [
+                (e.timestamp.replace(tzinfo=timezone.utc), e.dose)
+                for e in events
+                if e.dose
+            ]
+        )
+        for span in effectspans:
+            # will break horribly if any ; in output
+            data = span.data
+            data["doses"] = [{"amount": d.amount_with_unit} for d in data["doses"]]
+            print(
+                "; ".join(
+                    [
+                        span.timestamp.isoformat(),
+                        str(span.duration.total_seconds()),
+                        json.dumps(data),
+                    ]
+                )
+            )
     else:
         print("No matching events found")
 

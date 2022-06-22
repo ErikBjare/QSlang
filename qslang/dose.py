@@ -27,6 +27,11 @@ class Dose:
         return f"{self.amount_with_unit} {self.substance}"
 
     @property
+    def amount(self) -> float:
+        # return the amount as a float, in the base unit (kg for mass, L for volumes)
+        return self.quantity.to_base_units().magnitude
+
+    @property
     def amount_with_unit(self) -> str:
         q = self.quantity.to_compact()
         # print(q)

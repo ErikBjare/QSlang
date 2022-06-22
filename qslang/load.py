@@ -31,8 +31,7 @@ def _get_export_file() -> Path:
 
 
 def _load_standardnotes_export() -> List[str]:
-    # NOTE: ~~Deprecated~~
-    # NOTE: No longer deprecated as standardnotes-fs isn't working as well as it used to (after the standardnotes 004 upgrade)
+    # NOTE: Used to be deprecated, but not any longer as standardnotes-fs isn't working as well as it used to (after the standardnotes 004 upgrade)
 
     notes = []
     path = _get_export_file()
@@ -56,7 +55,7 @@ def _load_standardnotes_export() -> List[str]:
                 # print(entry["content"])
                 title = None
 
-    assert notes
+    assert notes, "no notes were read, is the file available and decrypted?"
     return notes
 
 
