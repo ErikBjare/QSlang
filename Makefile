@@ -11,6 +11,13 @@ test-integration:
 	qslang plot --count --substances Noopept
 	qslang plot --days --substances Noopept
 
+data/generated/effectspan-caffeine.csv:
+	poetry run python3 -m qslang effectspan --substances caffeine > $@
+
+data/generated/effectspan-cannabis.csv:
+	# TODO: the 'cannabis oil' part doesn't work
+	poetry run python3 -m qslang effectspan --substances 'weed,hash,cannabis oil' --normalize 'weed' > $@
+
 typecheck:
 	poetry run mypy --ignore-missing-import qslang/*.py tests/*.py
 

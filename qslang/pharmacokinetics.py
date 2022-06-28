@@ -52,6 +52,16 @@ subst_durations = {
     # NOTE: these are synonyms, and should be converted
     "caffeine": timedelta(hours=5),
     "coffee": timedelta(hours=5),
+    #
+    # NOTE: these are synonyms, and should be converted
+    "cannabis": timedelta(hours=3),
+    "weed": timedelta(hours=3),
+    "hash": timedelta(hours=3),
+    #
+    # NOTE: Alcohol clearance is badly modeled by a halflife or fixed duration, as clearance is ~constant.
+    #       From a search: "Alcohol leaves the body at an average rate of 0.015 g/100mL/hour"
+    # NOTE: This also has synonyms (Drink, Beer, Wine, Whiskey, etc.)
+    "alcohol": timedelta(hours=4),
 }
 
 
@@ -128,6 +138,8 @@ def test_effectspan():
     doses = [
         (datetime(2018, 9, 10, 8, tzinfo=timezone.utc), Dose("Caffeine", "75mg")),
         (datetime(2018, 9, 10, 12, tzinfo=timezone.utc), Dose("Caffeine", "50mg")),
+        (datetime(2018, 9, 10, 16, 20, tzinfo=timezone.utc), Dose("Cannabis", "0.03g")),
+        (datetime(2018, 9, 10, 19, tzinfo=timezone.utc), Dose("Cannabis", "0.05g")),
     ]
     events = effectspan(doses)
     for e in events:

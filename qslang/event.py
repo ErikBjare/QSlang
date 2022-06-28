@@ -2,6 +2,7 @@
 
 import logging
 import json
+from copy import copy
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 
@@ -25,7 +26,7 @@ class Event:
 
     @property
     def substance(self) -> Optional[str]:
-        return self.data["substance"].strip() if "substance" in self.data else None
+        return self.data["substance"] if "substance" in self.data else None
 
     @property
     def dose(self) -> Optional[Dose]:
@@ -51,6 +52,22 @@ class Event:
     def roa(self):
         return self.data["roa"] if "roa" in self.data else "unknown"
 
+    def prettyprint(self, show_misc=False) -> None:
+        if self.type == "data" and "amount" in self.data and "substance" in self.data:
+            d = self.data
+            misc = copy(self.data)
+            misc.pop("amount")
+            misc.pop("substance")
+            if self.dose:
+                base_str = str(self.dose)
+            else:
+                base_str = f"{d['amount'] if 'amount' in d else '?'} {d['substance']}"
+            misc_str = f"  -  {misc}" if show_misc else ""
+            e_str = base_str + misc_str
+        else:
+            e_str = str(self.data)
+        print(f"{self.timestamp.isoformat()} | {self.type.ljust(7)} | " + e_str)
+
     @property
     def json_dict(self) -> Dict[str, Any]:
         return {"timestamp": self.timestamp, "type": self.type, "data": self.data}
@@ -58,3 +75,14 @@ class Event:
     @property
     def json_str(self) -> str:
         return json.dumps(self.json_dict)
+
+
+def print_events(events: List[Event]) -> None:
+    last_date: Optional[datetime] = None
+    for e in events:
+        if last_date and last_date.date() != e.timestamp.date():
+            print(
+                f"{str(last_date.date()).ljust(8)} =========|=========|====== New day ====="
+            )
+        e.prettyprint()
+        last_date = e.timestamp

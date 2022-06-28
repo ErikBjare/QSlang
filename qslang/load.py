@@ -7,10 +7,13 @@ import json
 from typing import List, Dict
 from pathlib import Path
 from collections import defaultdict
+from datetime import datetime
 
 from .event import Event
 from .parse import parse, re_date
 from .config import load_config
+from .filter import filter_events
+from .preprocess import _alcohol_preprocess
 
 
 logger = logging.getLogger(__name__)
@@ -20,6 +23,32 @@ re_evernote_source = re.compile(r">source:(.+)$")
 
 
 base_dir = os.path.dirname(__file__)
+
+
+def load_events(
+    start: datetime = None, end: datetime = None, substances: List[str] = []
+) -> List[Event]:
+    events: List[Event] = []
+    for note in _load_standardnotes_export():
+        events += parse(note)
+    for note in _load_evernote():
+        events += parse(note)
+    events = _extend_substance_abbrs(events)
+    events = _tag_substances(events)
+    events = sorted(events)
+    events = filter_events(events, start, end, substances)
+    events = _alcohol_preprocess(events)
+
+    # sanity checks
+    illegal_chars = ["(", ")", "/"]
+    for e in events:
+        for char in illegal_chars:
+            if e.substance and char in e.substance:
+                logger.warning(
+                    f"Substance '{e.substance}' contained illegal char '{char}' (entry time: {e.timestamp})"
+                )
+
+    return events
 
 
 def _get_export_file() -> Path:
@@ -118,17 +147,6 @@ def _load_evernote() -> List[str]:
             notes.append(data)
     # pprint(sorted(dates))
     return notes
-
-
-def load_events() -> List[Event]:
-    events: List[Event] = []
-    for note in _load_standardnotes_export():
-        events += parse(note)
-    for note in _load_evernote():
-        events += parse(note)
-    events = _extend_substance_abbrs(events)
-    events = _tag_substances(events)
-    return sorted(events)
 
 
 def _load_categories() -> Dict[str, List[str]]:

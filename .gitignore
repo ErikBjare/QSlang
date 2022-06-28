@@ -1,4 +1,5 @@
 data/private
+data/generated
 .*cache
 __pycache__
 config.toml

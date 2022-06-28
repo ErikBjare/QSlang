@@ -4,7 +4,6 @@ import logging
 import statistics
 import json
 from typing import List, Dict, Tuple, Optional
-from copy import copy
 from collections import Counter, defaultdict
 from datetime import date, datetime, timedelta, timezone
 from itertools import groupby
@@ -15,11 +14,10 @@ import pandas as pd
 import click
 import pint
 
-from qslang import Event, Dose, load_events
-from qslang.util import monthrange, dayrange
-from qslang.igroupby import igroupby
-from qslang.filter import filter_events
-from qslang.preprocess import _alcohol_preprocess
+from . import Event, Dose, load_events, print_events
+from .util import monthrange, dayrange
+from .igroupby import igroupby
+from .pharmacokinetics import effectspan as _effectspan
 
 
 logger = logging.getLogger(__name__)
@@ -29,15 +27,6 @@ logger = logging.getLogger(__name__)
 @click.option("-v", "--verbose", is_flag=True)
 def qslang(verbose):
     logging.basicConfig(level=logging.DEBUG if verbose else logging.WARN)
-
-
-def _load_events(
-    start: datetime = None, end: datetime = None, substances: List[str] = []
-) -> List[Event]:
-    events = load_events()
-    events = filter_events(events, start, end, substances)
-    events = _alcohol_preprocess(events)
-    return events
 
 
 @qslang.command()
@@ -50,7 +39,7 @@ def _load_events(
 @click.option("--substances", help="substances to filter by (comma-separated)")
 def events(start: datetime, end: datetime, substances: Optional[str]):
     substances_list = substances.split(",") if substances else []
-    events = _load_events(start, end, substances_list)
+    events = load_events(start, end, substances_list)
     print_events(events)
 
 
@@ -62,10 +51,11 @@ def events(start: datetime, end: datetime, substances: Optional[str]):
     "--end", type=click.DateTime(["%Y-%m-%d"]), help="end date to filter events by"
 )
 @click.option("--substances", help="substances to filter by (comma-separated)")
-def doses(start: datetime, end: datetime, substances: str):
+def doses(start: datetime, end: datetime, substances: str) -> None:
     substances_list = substances.split(",") if substances else []
-    events = _load_events(start, end, substances_list)
+    events = load_events(start, end, substances_list)
     events = [e for e in events if e.substance]
+
     if events:
         for substance, substance_events in igroupby(
             events, lambda e: e.substance
@@ -84,14 +74,18 @@ def doses(start: datetime, end: datetime, substances: str):
     "--end", type=click.DateTime(["%Y-%m-%d"]), help="end date to filter events by"
 )
 @click.option("--substances", help="substances to filter by (comma-separated)")
-def effectspan(start: datetime, end: datetime, substances: str):
+@click.option("--normalize", help="consider all substances a particular substance")
+def effectspan(start: datetime, end: datetime, substances: str, normalize: str):
     substances_list = substances.split(",") if substances else []
-    events = _load_events(start, end, substances_list)
+    events = load_events(start, end, substances_list)
     events = [e for e in events if e.substance]
-    if events:
-        from .pharmacokinetics import effectspan
 
-        effectspans = effectspan(
+    if normalize:
+        for e in events:
+            e.data["substance"] = normalize
+
+    if events:
+        effectspans = _effectspan(
             [
                 (e.timestamp.replace(tzinfo=timezone.utc), e.dose)
                 for e in events
@@ -125,7 +119,7 @@ def effectspan(start: datetime, end: datetime, substances: str):
 @click.option("--substances", help="substances to filter by (comma-separated)")
 def substances(start, end, substances) -> None:
     substances_list = substances.split(",") if substances else []
-    events = _load_events(start, end, substances_list)
+    events = load_events(start, end, substances_list)
     c = Counter(
         {
             k: len(v)
@@ -161,7 +155,7 @@ def plot(
     days: bool,
 ):
     substances_list = substances.split(",") if substances else []
-    events = _load_events(start, end, substances_list)
+    events = load_events(start, end, substances_list)
     _plot_frequency(
         events, count=count or days, one_per_day=days, daily=daily, any_substance=any
     )
@@ -177,36 +171,8 @@ def plot(
 @click.option("--substances", help="substances to filter by (comma-separated)")
 def plot_calendar(start: Optional[datetime], end: Optional[datetime], substances: str):
     substances_list = substances.split(",") if substances else []
-    events = _load_events(start, end, substances_list)
+    events = load_events(start, end, substances_list)
     _plot_calendar(events)
-
-
-def print_event(e: Event, show_misc=False) -> None:
-    if e.type == "data" and "amount" in e.data and "substance" in e.data:
-        d = e.data
-        misc = copy(e.data)
-        misc.pop("amount")
-        misc.pop("substance")
-        if e.dose:
-            base_str = str(e.dose)
-        else:
-            base_str = f"{d['amount'] if 'amount' in d else '?'} {d['substance']}"
-        misc_str = f"  -  {misc}" if show_misc else ""
-        e_str = base_str + misc_str
-    else:
-        e_str = str(e.data)
-    print(f"{e.timestamp.isoformat()} | {e.type.ljust(7)} | " + e_str)
-
-
-def print_events(events: List[Event]) -> None:
-    last_date: Optional[datetime] = None
-    for e in events:
-        if last_date and last_date.date() != e.timestamp.date():
-            print(
-                f"{str(last_date.date()).ljust(8)} =========|=========|====== New day ====="
-            )
-        print_event(e)
-        last_date = e.timestamp
 
 
 def _print_daily_doses(
@@ -449,11 +415,6 @@ def _plot_calendar(events, cmap="Reds", fillcolor="whitesmoke", **kwargs):
         series, fillcolor=fillcolor, cmap=cmap, linewidth=1, fig_kws=kwargs
     )
     plt.show()
-
-
-def _datetime_arg(s):
-    d = datetime(*[int(d) for d in s.split("-")])
-    return d
 
 
 if __name__ == "__main__":

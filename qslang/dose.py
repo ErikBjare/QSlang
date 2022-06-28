@@ -12,6 +12,15 @@ ureg = pint.UnitRegistry()
 ureg.define("micro- = 10**-6 = mc- = μ-")
 ureg.define("micro- = 10**-6 = mc- = μ-")
 
+ureg.define("cup = 2*dl")
+
+# NOTE: Not sure if this is correct? But gets rid of the warnings...
+ureg.define("x = count")
+ureg.define("IU = x")  # for now
+ureg.define("CFU = x")  # for now
+
+ureg.define("B = 10**9 * x")  # for noting billions of CFU, for example
+
 # The type here is because mypy doesn't like this dynamically created type
 Q_ = ureg.Quantity  # type: Any
 
@@ -33,6 +42,8 @@ class Dose:
 
     @property
     def amount_with_unit(self) -> str:
+        if not self.quantity.units:
+            return str(round(self.quantity))
         q = self.quantity.to_compact()
         # print(q)
         amount = q.magnitude
@@ -43,6 +54,10 @@ class Dose:
         return f"<Dose {self}>"
 
     def __add__(self, other: "Dose") -> "Dose":
+        if self.quantity.units.dimensionality != other.quantity.units.dimensionality:
+            raise ValueError(
+                f"Cannot add doses with different units: {self.quantity.units} and {other.quantity.units} (for {self} and {other})"
+            )
         assert self.substance.lower() == other.substance.lower()
         return Dose(self.substance, self.quantity + other.quantity)
 
@@ -57,3 +72,23 @@ class Dose:
             self.substance == other.substance
             and round((self.quantity - other.quantity).magnitude, 12) == 0
         )
+
+
+def test_amount_with_unit():
+    d = Dose("L", "100 mcg")
+    assert d.amount_with_unit == "100mcg"
+
+
+def test_amount_unitless():
+    d = Dose("Candy", "10x")
+    assert d.amount_with_unit == "10x"
+
+
+def test_amount_iu():
+    d = Dose("Vitamin D", "5000 IU")
+    assert d.amount_with_unit == "5kIU"
+
+
+def test_amount_cfu():
+    d = Dose("CFU", "7B")
+    assert d.amount_with_unit == "7B"
