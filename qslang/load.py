@@ -10,7 +10,8 @@ from collections import defaultdict
 from datetime import datetime
 
 from .event import Event
-from .parse import parse, re_date
+from .parse import re_date
+from .parsimonious import parse
 from .config import load_config
 from .filter import filter_events
 from .preprocess import _alcohol_preprocess
