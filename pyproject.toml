@@ -13,23 +13,24 @@ qslang = "qslang:__main__"
 
 [tool.poetry.dependencies]
 python = "^3.9"
+aw-core = "*"
+
 numpy = "*"
 matplotlib = "*"
 pandas = "*"
+calplot = "^0.1"  # fork of calmap
+
+click = "*"
 pint = "*"
 toml = "*"
-click = "*"
-calplot = "^0.1"  # fork of calmap
-aw-core = "*"
+
 regex = "^2022.6.2"
 parsimonious = "^0.9.0"
 
-[tool.poetry.group.dev.dependencies]
-pytest-cov = "^3.0.0"
-pytest-ordering = "^0.6"
-
 [tool.poetry.dev-dependencies]
 pytest = "*"
+pytest-cov = "*"
+pytest-ordering = "*"
 mypy = "*"
 flake8 = "*"
 black = "*"
