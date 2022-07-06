@@ -3,7 +3,7 @@
 import logging
 import json
 from copy import copy
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Hashable
 from datetime import datetime
 
 from dataclasses import dataclass, field
@@ -14,11 +14,27 @@ from .dose import Dose
 log = logging.getLogger(__name__)
 
 
+def _freeze(obj: Any) -> Any:
+    if isinstance(obj, Hashable):
+        return obj
+    elif isinstance(obj, datetime):
+        return obj.isoformat()
+    elif isinstance(obj, list):
+        return tuple(_freeze(x) for x in obj)
+    elif isinstance(obj, dict):
+        return tuple((k, _freeze(v)) for k, v in obj.items())
+    else:
+        raise ValueError("Cannot freeze object of type %s" % type(obj))
+
+
 @dataclass(order=True)
 class Event:
     timestamp: datetime
     type: str
     data: dict = field(compare=False)
+
+    def __hash__(self):
+        return hash((self.timestamp, self.type, _freeze(self.data)))
 
     @property
     def tags(self) -> List[str]:

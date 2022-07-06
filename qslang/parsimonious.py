@@ -7,7 +7,7 @@ We will comment step by step how the parser works.
 
 import logging
 import pytest
-from typing import List, Dict, Any, Generator, Iterator
+from typing import List, Dict, Any, Generator, Iterator, Union
 from datetime import time, date, datetime, timedelta
 
 import parsimonious
@@ -57,10 +57,11 @@ grammar = parsimonious.Grammar(
     baseunit    = "g" / "l"
     substance   = ~"[a-z0-9\-]+"i (ws !roa ~"[a-z0-9\-]+"i)*
     extra       = "(" extra_data (ws "," ws extra_data)* ")"
-    extra_data  = dose_list / short_note / percent
-    short_note  = ~"[A-Z][^,)\n]+"i
-    percent     = number "%" ws substance?
-    roa         = "oral" / "vape" / "vaporized" / "intranasal" / "insufflated" / "subcutaneous" / "subl" / "smoked" / "spliff"
+    extra_data  = percent / dose_list / short_note
+    short_note  = ratio? ws ~"[A-Z][^,)\n]+"i?
+    ratio       = ~"[0-9]+:[0-9]+"
+    percent     = ~"[>]"? number "%" ws substance?
+    roa         = "oral" / ~"vap(ed|orized)?" / "intranasal" / "insufflated" / "subcutaneous" / ~"subl(ingual)?" / "smoked" / "spliff" / "inhaled" / "buccal"
 
     approx = "~"
     unknown = "?"
@@ -69,10 +70,26 @@ grammar = parsimonious.Grammar(
 )
 
 
-def parse(s: str) -> List[Event]:
-    visitor = Visitor()
-    visitor.grammar = grammar
-    return visitor.parse(s.strip())
+def parse(s: str, continue_on_err=False) -> List[Event]:
+    if continue_on_err:
+        entries: List[Event | ParseError] = parse_continue_on_err(s)
+        events = []
+        for e in entries:
+            if isinstance(e, Event):
+                if e.timestamp.date() < date(1901, 1, 1):
+                    logger.warning("No date for events")
+                events.append(e)
+            elif isinstance(e, ParseError):
+                logger.warning(f"Error while parsing: {e}")
+        # check how many have 1900-1-1 as date
+        n_no_date = len([e for e in events if e.timestamp.date() <= date(1994, 1, 1)])
+        if n_no_date:
+            logger.warning(f"{n_no_date} events have no date")
+        return events
+    else:
+        visitor = Visitor()
+        visitor.grammar = grammar
+        return visitor.parse(s.strip())
 
 
 def parse_to_node(string, rule=None) -> Node:
@@ -136,7 +153,6 @@ class Visitor(NodeVisitor):
         _, time_prefix, time, _, _, _, entries, _, _ = visited_children
 
         if day is None:
-            logger.warning("No day specified for entry, assuming 1900-01-01")
             day = date(1900, 1, 1)
 
         timestamp = datetime.combine(day, time)
@@ -170,6 +186,9 @@ class Visitor(NodeVisitor):
 
     def visit_next_day(self, node, visited_children) -> str:
         return "next_day"
+
+    def visit_unknown(self, node, visited_children) -> str:
+        return "unknown"
 
     def visit_entry_data(self, node, visited_children) -> List[Dict[str, Any]]:
         doses_or_note = visited_children[0]
@@ -264,6 +283,9 @@ class Visitor(NodeVisitor):
 
     def visit_short_note(self, node, visited_children) -> dict:
         return {"note": node.text}
+
+    def visit_ratio(self, node, visited_children) -> str:
+        return node.text
 
     def visit_siprefix(self, node, visited_children) -> str:
         return node.text
@@ -417,6 +439,16 @@ def test_parse_patient():
     assert parsed[1].data["patient"] == "F"
 
 
+def test_parse_ratio():
+    s = """
+    19:00 - 1g Some kind of extract (10:1)
+    """
+    entries = parse(s)
+    assert len(entries) == 1
+    assert entries[0].data["substance"] == "Some kind of extract"
+    assert entries[0].data["notes"][0] == {"note": "10:1"}
+
+
 # Parse to node tests
 
 
@@ -475,7 +507,21 @@ def test_parse_entries():
     assert len(entries) == 2
 
 
-def test_parse_notes():
+def test_parse_decimal():
+    s = """
+    19:00 - 3.5g Creatine monohydrate
+    """
+    assert list(parse_entries(s))
+
+
+def test_parse_percent():
+    s = """
+    19:00 - Drink (8%)
+    """
+    assert list(parse_entries(s))
+
+
+def test_parse_entries_notes():
     s = """
     09:30 - Just a plain note
 
@@ -484,7 +530,7 @@ def test_parse_notes():
     assert list(parse_entries(s))
 
 
-def test_parse_day_example():
+def test_parse_entries_day_example():
     s = """
     # 2020-01-01
 
@@ -508,3 +554,63 @@ def test_parse_next_day():
     assert len(entries) == 2
     assert entries[0].timestamp == datetime(2017, 6, 8, 10, 0)
     assert entries[1].timestamp == datetime(2017, 6, 9, 0, 30)
+
+
+class ParseError:
+    def __init__(self, e: BaseException, s: str, date: str):
+        self.e = e
+        self.s = s
+        self.date = date
+
+    def __repr__(self):
+        return f"<ParseError: {self.e}, string: {self.s}, date: {self.date}>"
+
+
+def test_parse_continue_on_err():
+    s = """
+    # 2020-01-01
+
+    08:00 - 1x This will lead to an error ((+)
+
+    09:00 - But this should still parse to a note.
+    """
+    entries = parse_continue_on_err(s)
+    assert len(entries) == 2
+
+    # first entry is a parse error
+    assert isinstance(entries[0], ParseError)
+
+    # ensure that the day header is being tracked
+    assert isinstance(entries[1], Event)
+    assert entries[1].timestamp == datetime(2020, 1, 1, 9, 0)
+
+
+def parse_continue_on_err(s: str) -> List[Event | ParseError]:
+    """
+    We want to parse events row by row, so we can handle errors (which ``parse`` cannot).
+
+    To do this, we need to parse line by line, returning errors with correct timestamps
+    determined by previous day header. If an event cannot be read, return an 'ParseError'
+    instead, for filtering by the caller.
+    """
+    entries: List[Event | ParseError] = []
+    day_header = ""
+    for line in s.splitlines():
+        line = line.strip()
+
+        # skip empty lines
+        if not line:
+            continue
+
+        if line.startswith("# 20"):  # assumption will break for dates >=2100-1-1
+            day_header = line
+            continue
+
+        try:
+            events = parse(day_header + "\n" + line)
+            if events:
+                entries.extend(events)
+        except Exception as e:
+            entries.append(ParseError(e, line, day_header[2:]))
+
+    return entries

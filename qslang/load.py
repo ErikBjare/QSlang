@@ -30,10 +30,20 @@ def load_events(
     start: datetime = None, end: datetime = None, substances: List[str] = []
 ) -> List[Event]:
     events: List[Event] = []
+
+    # NOTE: Many notes are duplicated (due to conflicts),
+    # so we will end up with duplcate events that we have to deal with.
     for note in _load_standardnotes_export():
-        events += parse(note)
+        events += parse(note, continue_on_err=True)
+
+    # remove duplicate events
+    events_pre = len(events)
+    events = list(set(events))
+    logger.warning("Removed duplicate events: %d -> %d", events_pre, len(events))
+
     for note in _load_evernote():
-        events += parse(note)
+        events += parse(note, continue_on_err=True)
+
     events = _extend_substance_abbrs(events)
     events = _tag_substances(events)
     events = sorted(events)
@@ -198,5 +208,7 @@ def _extend_substance_abbrs(events) -> List[Event]:
     return events
 
 
-def test_load():
-    load_events()
+def test_load_events():
+    events = load_events()
+    assert events
+    print(f"Loaded {len(events)} events")
