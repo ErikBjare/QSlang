@@ -73,7 +73,7 @@ grammar = parsimonious.Grammar(
 
 def parse(s: str, continue_on_err=False) -> List[Event]:
     if continue_on_err:
-        entries: List[Event | ParseError] = parse_continue_on_err(s)
+        entries: List[Union[Event, ParseError]] = parse_continue_on_err(s)
         events = []
         for e in entries:
             if isinstance(e, Event):
@@ -636,7 +636,7 @@ def test_parse_continue_on_err():
     assert entries[1].timestamp == datetime(2020, 1, 1, 9, 0)
 
 
-def parse_continue_on_err(s: str) -> List[Event | ParseError]:
+def parse_continue_on_err(s: str) -> List[Union[Event, ParseError]]:
     """
     We want to parse events row by row, so we can handle errors (which ``parse`` cannot).
 
@@ -644,7 +644,7 @@ def parse_continue_on_err(s: str) -> List[Event | ParseError]:
     determined by previous day header. If an event cannot be read, return an 'ParseError'
     instead, for filtering by the caller.
     """
-    entries: List[Event | ParseError] = []
+    entries: List[Union[Event, ParseError]] = []
     day_header = ""
     for line in s.splitlines():
         line = line.strip()
