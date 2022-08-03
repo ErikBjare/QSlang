@@ -32,8 +32,8 @@ def monthrange(
 ) -> List[Tuple[int, int]]:
     (min_year, min_month) = min_date
     (max_year, max_month) = max_date
-    g = itertools.product(range(min_year, max_year + 1), range(1, 13))
-    g = itertools.dropwhile(lambda t: t < (min_year, min_month), g)
+    g = list(itertools.product(range(min_year, max_year + 1), range(1, 13)))
+    g = list(itertools.dropwhile(lambda t: t < (min_year, min_month), g))
     return list(itertools.takewhile(lambda t: t <= (max_year, max_month), g))
 
 

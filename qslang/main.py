@@ -366,14 +366,14 @@ def _plot_frequency(
         period_counts = _sum_doses(events, monthly=not daily)
 
     labels: List[Tuple[int, int, int]] = [
-        date for sd in period_counts for date in period_counts[sd].keys()
+        (date[0], date[1], date[2] or 0)
+        for sd in period_counts
+        for date in period_counts[sd].keys()
     ]
     if daily:
         labels = dayrange(min(labels), max(labels))
     else:
-        labels = [
-            (m[0], m[1], None) for m in monthrange(min(labels)[:2], max(labels)[:2])
-        ]
+        labels = [(m[0], m[1], 0) for m in monthrange(min(labels)[:2], max(labels)[:2])]
     labels_str = ["-".join([str(n) for n in t if n]) for t in labels]
 
     stackheight = np.zeros(len(labels))
