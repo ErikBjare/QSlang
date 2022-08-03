@@ -388,7 +388,7 @@ def _plot_frequency(
 
 
 def _plot_calendar(events, cmap="Reds", fillcolor="whitesmoke", **kwargs):
-    import calmap
+    import calplot
 
     # Filter away journal entries and sort
     events = list(sorted(filter(lambda e: e.type == "data", events)))
@@ -411,7 +411,7 @@ def _plot_calendar(events, cmap="Reds", fillcolor="whitesmoke", **kwargs):
     series = series.resample("D").sum().asfreq("D")
     # print(series.tail(20))
 
-    calmap.calendarplot(
+    calplot.calendarplot(
         series, fillcolor=fillcolor, cmap=cmap, linewidth=1, fig_kws=kwargs
     )
     plt.show()
