@@ -197,8 +197,9 @@ def _tag_substances(events: List[Event]) -> List[Event]:
             cats = substance_categories[e.substance.lower()]
             e.data["tags"] = cats
     n_categorized = len([e for e in events if e.tags])
+    frac_categorized = n_categorized / len(events) if events else 0.0
     logger.info(
-        f"Categorized {n_categorized} out of {len(events)} events ({round(n_categorized/len(events)*100, 1)}%)"
+        f"Categorized {n_categorized} out of {len(events)} events ({round(frac_categorized*100, 1)}%)"
     )
     return events
 
