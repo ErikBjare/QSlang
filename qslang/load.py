@@ -4,7 +4,7 @@ import os
 import re
 import logging
 import json
-from typing import List, Dict
+from typing import List, Dict, Optional
 from pathlib import Path
 from collections import defaultdict
 from datetime import datetime
@@ -62,21 +62,23 @@ def load_events(
     return events
 
 
-def _get_export_file() -> Path:
+def _get_export_file() -> Optional[Path]:
     config = load_config()
     p = config.get("data", {}).get("standardnotes_export", None)
     if p is None:
-        raise ValueError("no standardnotes export in config")
+        return None
     return Path(p)
 
 
 def _load_standardnotes_export() -> List[str]:
     # NOTE: Used to be deprecated, but not any longer as standardnotes-fs isn't working as well as it used to (after the standardnotes 004 upgrade)
-
-    notes = []
     path = _get_export_file()
+    if path is None:
+        logger.warning("no standardnotes export in config")
+        return []
 
     print(f"Loading standardnotes from {path}")
+    notes = []
     with open(path) as f:
         data = json.load(f)
         for entry in sorted(
