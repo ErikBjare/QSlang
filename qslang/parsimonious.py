@@ -34,7 +34,7 @@ grammar = parsimonious.Grammar(
     r"""
     entries     = day_header? ws (entry)*
 
-    day_header  = '#' ws date nl?
+    day_header  = '#' ws date (ws "-" ws ~"[a-z ]+"i)? nl?
     entry       = ws time_prefix* time ws "-" ws entry_data ws nl?
     entry_data  = dose_list / note
     note        = ~"[A-Z][^\n]+"i
@@ -49,17 +49,18 @@ grammar = parsimonious.Grammar(
     dose        = patient? ws amount ws substance ws extra? ws roa?
     dose_list   = dose (ws "+" ws dose)*
     patient     = "{" ~"[a-z]+"i "}"
-    amount      = (approx? number ws unit?) / (unknown ws unit?)
+    amount      = (unknown ws unit?) / (approx? fraction ws unit?) / (approx? number ws unit?)
     number      = ~"[0-9]+[.]?[0-9]*"
     unit        = prefixlessunit / (siprefix? baseunit)
-    prefixlessunit = "cup" / "x" / "IU" / "GDU" / "serving"
+    prefixlessunit = "cup" / "x" / "IU" / "GDU" / "B" / "serving"
     siprefix    = "n" / "u" / "mc" / "m" / "c" / "d"
     baseunit    = "g" / "l"
-    substance   = ~"[a-z0-9\-]+"i (ws !roa ~"[a-z0-9\-]+"i)*
+    substance   = ~"[a-z0-9\-äåö]+"i (ws !roa ~"[a-z0-9\-åäö]+"i)*
     extra       = "(" extra_data (ws "," ws extra_data)* ")"
     extra_data  = percent / dose_list / short_note
     short_note  = ratio? ws ~"[A-Z][^,)\n]+"i?
     ratio       = ~"[0-9]+:[0-9]+"
+    fraction    = ~"[0-9]+\/[0-9]+"
     percent     = ~"[>]"? number "%" ws substance?
     roa         = "oral" / ~"vap(ed|orized)?" / "intranasal" / "insufflated" / "subcutaneous" / ~"subl(ingual)?" / "smoked" / "spliff" / "inhaled" / "buccal"
 
@@ -177,7 +178,7 @@ class Visitor(NodeVisitor):
         return events
 
     def visit_day_header(self, node, visited_children) -> date:
-        _, _, day, _ = visited_children
+        _, _, day, *_ = visited_children
         assert isinstance(day, date)
         return day
 
@@ -296,8 +297,14 @@ class Visitor(NodeVisitor):
     def visit_amount(self, node, visited_children) -> Dict[str, Any]:
         visited_children = visited_children[0]
         if len(visited_children) == 4:
-            (_, amount, _, unit) = visited_children
-            return {"amount": amount, "unit": unit[0] if unit else "unknown"}
+            (approx, amount, _, unit) = visited_children
+            d = {
+                "amount": amount,
+                "unit": unit[0] if unit else "unknown",
+            }
+            if approx:
+                d["approx"] = True
+            return d
         elif len(visited_children) == 3:
             (_, amount, unit) = visited_children
             return {"amount": "unknown", "unit": unit[0] if unit else "unknown"}
@@ -324,6 +331,9 @@ class Visitor(NodeVisitor):
 
     def visit_percent(self, node, visited_children) -> Dict[str, Any]:
         return {"note": node.text}
+
+    def visit_fraction(self, node, visited_children) -> float:
+        return eval(node.text)
 
     def visit_time_prefix(self, node, visited_children) -> str:
         return visited_children
@@ -415,7 +425,10 @@ def test_parse_complex():
         {"note": "milk"},
     ]
     assert parsed[0].data.get("subdoses", []) == [
-        {"substance": "Caffeine", "dose": {"amount": 100, "unit": "mg"}},
+        {
+            "substance": "Caffeine",
+            "dose": {"amount": 100, "unit": "mg", "approx": True},
+        },
         {"substance": "L-Theanine", "dose": {"amount": 50, "unit": "mg"}},
         {"substance": "LOL", "dose": {"amount": 1, "unit": "mg"}},
     ]
@@ -447,6 +460,44 @@ def test_parse_ratio():
     assert len(entries) == 1
     assert entries[0].data["substance"] == "Some kind of extract"
     assert entries[0].data["notes"][0] == {"note": "10:1"}
+
+
+def test_parse_umlaut():
+    # Umlaut in substance name
+    s = """20:00 - 4cl Jägermeister"""
+    entries = parse(s)
+    assert len(entries) == 1
+    assert entries[0].data["substance"] == "Jägermeister"
+
+
+def test_parse_half_serving():
+    # Half serving
+    s = """20:00 - 1/2 serving Elevate Pre-workout Formula (5g Vitargo + 1.6g Beta-Alanine + 1.5g Citrulline Malate + 1.5g Arginine Alpha Ketoglutarate + 1.25g Trimethylglycine + 1g Taurine + 250mg Glucuronolactone + 200mg L-Tyrosine + 150mg Grape Seed Extract + 125mg Caffeine + 90mg ACTINOS + 12.5mg Vitamin B6 + 2.5mg Bioperine) + 5g Creatine"""
+    entries = parse(s)
+    assert len(entries) == 2
+    assert entries[0].data["substance"] == "Elevate Pre-workout Formula"
+    assert entries[0].data["dose"]["unit"] == "serving"
+    # assert entries[0].data["dose"]["amount"] == 0.5
+
+
+def test_parse_dayheader_title():
+    # Half serving
+    s = """# 2022-08-03 - Just some example title"""
+    parse(s)
+
+
+def test_parse_probiotic_cfu():
+    # Half serving
+    s = """10:00 - 1x Probiotic (30B CFU)"""
+    entries = parse(s)
+    assert len(entries) == 1
+    assert entries[0].data["substance"] == "Probiotic"
+    assert entries[0].data["dose"]["amount"] == 1
+    assert entries[0].data["dose"]["unit"] == "x"
+    assert entries[0].data["subdoses"] == [
+        {"substance": "CFU", "dose": {"amount": 30, "unit": "B"}}
+    ]
+    # assert entries[0].data["notes"] == [{"note": "30B CFU"}]
 
 
 # Parse to node tests
@@ -516,7 +567,7 @@ def test_parse_decimal():
 
 def test_parse_percent():
     s = """
-    19:00 - Drink (8%)
+    19:00 - 4cl Drink (8%)
     """
     assert list(parse_entries(s))
 
