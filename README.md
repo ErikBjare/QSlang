@@ -1,5 +1,10 @@
-qslang
+QSlang
 ======
+
+[![Build](https://github.com/ErikBjare/QSlang/actions/workflows/build.yml/badge.svg)](https://github.com/ErikBjare/QSlang/actions/workflows/build.yml)
+[![codecov](https://codecov.io/gh/ErikBjare/qslang/branch/master/graph/badge.svg)](https://codecov.io/gh/ErikBjare/qslang)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![Typechecking: Mypy](http://www.mypy-lang.org/static/mypy_badge.svg)](http://mypy-lang.org/)
 
 A text-based language for manual entry of quantified self data.
 
