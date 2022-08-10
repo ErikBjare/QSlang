@@ -7,7 +7,7 @@ We will comment step by step how the parser works.
 
 import logging
 import pytest
-from typing import List, Dict, Any, Generator, Iterator, Union
+from typing import List, Dict, Any, Generator, Union, Tuple
 from datetime import time, date, datetime, timedelta
 
 import parsimonious
@@ -24,6 +24,16 @@ def flatten(ls: List[Any]) -> List[Any]:
     if not isinstance(ls, list):
         raise TypeError("Expected a list")
     return [item for sublist in ls for item in sublist]
+
+
+class ParseError:
+    def __init__(self, e: BaseException, s: str, date: str):
+        self.e = e
+        self.s = s
+        self.date = date
+
+    def __repr__(self):
+        return f"<ParseError: {self.e}, string: {self.s}, date: {self.date}>"
 
 
 # Step 1: Create a parsimonious grammar
@@ -62,7 +72,7 @@ grammar = parsimonious.Grammar(
     ratio       = ~"[0-9]+:[0-9]+"
     fraction    = ~"[0-9]+\/[0-9]+"
     percent     = ~"[>]"? number "%" ws substance?
-    roa         = "oral" / ~"vap(ed|orized)?" / "intranasal" / "insufflated" / "subcutaneous" / ~"subl(ingual)?" / "smoked" / "spliff" / "inhaled" / "buccal"
+    roa         = "oral" / ~"vap(ed|orized)?" / "intranasal" / ~"insuff(lated)?" / ~"subcut(aneous)?" / ~"subl(ingual)?" / "smoked" / "spliff" / "inhaled" / "buccal" / "rectal"
 
     approx = "~"
     unknown = "?"
@@ -71,26 +81,32 @@ grammar = parsimonious.Grammar(
 )
 
 
-def parse(s: str, continue_on_err=False) -> List[Event]:
+def parse(s: str, continue_on_err=False) -> Tuple[List[Event], List[ParseError]]:
     if continue_on_err:
         entries: List[Union[Event, ParseError]] = parse_continue_on_err(s)
         events = []
+        errors = []
         for e in entries:
             if isinstance(e, Event):
                 if e.timestamp.date() < date(1901, 1, 1):
                     logger.warning("No date for events")
                 events.append(e)
             elif isinstance(e, ParseError):
-                logger.warning(f"Error while parsing: {e}")
+                # logger.warning(f"Error while parsing: {e}")
+                errors.append(e)
+            else:
+                print(e)
+                raise TypeError(f"Unexpected type: {type(e)}")
         # check how many have 1900-1-1 as date
         n_no_date = len([e for e in events if e.timestamp.date() <= date(1994, 1, 1)])
         if n_no_date:
             logger.warning(f"{n_no_date} events have no date")
-        return events
+        return events, errors
     else:
         visitor = Visitor()
         visitor.grammar = grammar
-        return visitor.parse(s.strip())
+        events: List[Event] = visitor.parse(s.strip())  # type: ignore
+        return events, []
 
 
 def parse_to_node(string, rule=None) -> Node:
@@ -171,7 +187,7 @@ class Visitor(NodeVisitor):
             events.append(
                 Event(
                     timestamp=timestamp,
-                    type="dose" if "substance" in data else "note",
+                    type="dose" if "substance" in data else "journal",
                     data=data,
                 )
             )
@@ -607,16 +623,6 @@ def test_parse_next_day():
     assert entries[1].timestamp == datetime(2017, 6, 9, 0, 30)
 
 
-class ParseError:
-    def __init__(self, e: BaseException, s: str, date: str):
-        self.e = e
-        self.s = s
-        self.date = date
-
-    def __repr__(self):
-        return f"<ParseError: {self.e}, string: {self.s}, date: {self.date}>"
-
-
 def test_parse_continue_on_err():
     s = """
     # 2020-01-01
@@ -658,7 +664,8 @@ def parse_continue_on_err(s: str) -> List[Union[Event, ParseError]]:
             continue
 
         try:
-            events = parse(day_header + "\n" + line)
+            events, errors = parse(day_header + "\n" + line)
+            assert not errors
             if events:
                 entries.extend(events)
         except Exception as e:

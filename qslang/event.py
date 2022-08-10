@@ -3,7 +3,7 @@
 import logging
 import json
 from copy import copy
-from typing import List, Dict, Any, Optional, Hashable
+from typing import List, Dict, Any, Optional, Hashable, Union, Literal
 from datetime import datetime
 
 from dataclasses import dataclass, field
@@ -30,7 +30,7 @@ def _freeze(obj: Any) -> Any:
 @dataclass(order=True)
 class Event:
     timestamp: datetime
-    type: str
+    type: Union[Literal["dose"], Literal["journal"]]
     data: dict = field(compare=False)
 
     def __hash__(self):
@@ -46,30 +46,41 @@ class Event:
 
     @property
     def dose(self) -> Optional[Dose]:
-        if self.substance and self.amount:
+        if self.type == "dose":
             try:
-                return Dose(self.substance, self.amount)
+                assert self.substance
+                # NOTE: Amount could be None, if specified as unknown ("?") in entry
+                return Dose(self.substance, self.amount or 0)
             except Exception as e:
+                print(self.data)
                 log.warning(f"Unable to build Dose object: {e}")
                 return None
         else:
             return None
 
     @property
-    def amount(self):
-        # TODO: Move stripping of '~' etc into parsing and annotate meaning using tags?
-        return (
-            self.data["amount"].strip("~")
-            if "amount" in self.data and "?" not in self.data["amount"]
-            else None
-        )
+    def amount(self) -> Optional[float]:
+        """Returns the amount with unit, or None"""
+        try:
+            assert "dose" in self.data
+            assert "amount" in self.data["dose"]
+            amount = self.data["dose"]["amount"]
+            assert amount != "unknown"
+            return str(amount) + self.data["dose"]["unit"]
+        except AssertionError:
+            return None
 
     @property
-    def roa(self):
-        return self.data["roa"] if "roa" in self.data else "unknown"
+    def roa(self) -> str:
+        try:
+            assert "dose" in self.data
+            assert "roa" in self.data["dose"]
+            return self.data["dose"]["roa"]
+        except AssertionError:
+            return "unknown"
 
     def prettyprint(self, show_misc=False) -> None:
-        if self.type == "data" and "amount" in self.data and "substance" in self.data:
+        if self.type == "dose" and "amount" in self.data and "substance" in self.data:
             d = self.data
             misc = copy(self.data)
             misc.pop("amount")

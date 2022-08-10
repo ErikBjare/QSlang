@@ -26,6 +26,35 @@ re_evernote_source = re.compile(r">source:(.+)$")
 base_dir = os.path.dirname(__file__)
 
 
+def load_notes(notes: List[str]) -> List[Event]:
+    """
+    Load events from raw notes.
+
+    - Collects errors
+    - Deals with duplicates
+    """
+    events = []
+    errors = []
+    for note in notes:
+        note_events, note_errors = parse(note, continue_on_err=True)
+        events += note_events
+        errors += note_errors
+    if errors:
+        logger.warning("Parsed %d notes with %d errors", len(events), len(errors))
+        total = len(events) + len(errors)
+        logger.warning(
+            f"Found {len(errors)} ({len(errors) / total * 100:.2f}%) errors when parsing {total} notes"
+        )
+
+    # remove duplicate events
+    events_pre = len(events)
+    events = list(set(events))
+    if len(events) != events_pre:
+        logger.warning("Removed duplicate events: %d -> %d", events_pre, len(events))
+
+    return events
+
+
 def load_events(
     start: datetime = None, end: datetime = None, substances: List[str] = []
 ) -> List[Event]:
@@ -33,16 +62,11 @@ def load_events(
 
     # NOTE: Many notes are duplicated (due to conflicts),
     # so we will end up with duplcate events that we have to deal with.
-    for note in _load_standardnotes_export():
-        events += parse(note, continue_on_err=True)
+    logger.info("Loading standardnotes notes")
+    events += load_notes(_load_standardnotes_export())
 
-    # remove duplicate events
-    events_pre = len(events)
-    events = list(set(events))
-    logger.warning("Removed duplicate events: %d -> %d", events_pre, len(events))
-
-    for note in _load_evernote():
-        events += parse(note, continue_on_err=True)
+    logger.info("Loading standardnotes notes")
+    events += load_notes(_load_evernote())
 
     events = _extend_substance_abbrs(events)
     events = _tag_substances(events)

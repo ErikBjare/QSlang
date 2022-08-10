@@ -18,15 +18,18 @@ from . import Event, Dose, load_events, print_events
 from .util import monthrange, dayrange
 from .igroupby import igroupby
 from .pharmacokinetics import effectspan as _effectspan
-
+from .avg_times import average_times_of_day, mean_time
 
 logger = logging.getLogger(__name__)
+
+# TODO: Make configurable
+start_of_day = timedelta(hours=4)
 
 
 @click.group()
 @click.option("-v", "--verbose", is_flag=True)
-def qslang(verbose):
-    logging.basicConfig(level=logging.DEBUG if verbose else logging.WARN)
+def qslang(verbose=False):
+    logging.basicConfig(level=logging.DEBUG if verbose else logging.INFO)
 
 
 @qslang.command()
@@ -184,10 +187,13 @@ def _print_daily_doses(
         if e.substance and e.substance.lower() == substance.lower() and e.dose
     ]
     if not events:
-        print(f"No doses found for substance '{substance}'")
+        logger.info(f"No doses found for substance '{substance}'")
         return
 
-    grouped_by_date = igroupby(sorted(events), key=lambda e: e.timestamp.date())
+    # NOTE: Respects the 'start of day' setting when grouping by date
+    grouped_by_date = igroupby(
+        sorted(events), key=lambda e: (e.timestamp - start_of_day).date()
+    )
     assert events[0].dose
     tot_amt = Dose(substance, events[0].dose.quantity * 0)
     for _, v in grouped_by_date.items():
@@ -215,6 +221,13 @@ def _print_daily_doses(
     )
     print(f" - {len(grouped_by_date)} days totalling {tot_amt.amount_with_unit}")
     print(f" - avg dose/day: {tot_amt/len(events)}")
+
+    first_daily_dose_times: List[datetime] = [
+        min(e.timestamp - start_of_day for e in events) + start_of_day
+        for events in grouped_by_date.values()
+    ]
+    avg_time_of_first_daily_dose = mean_time([t.time() for t in first_daily_dose_times])
+    print(f" - avg time of first daily dose: {avg_time_of_first_daily_dose}")
 
     try:
         median_dose = statistics.median(e.dose for e in events if e.dose)  # type: ignore
@@ -352,7 +365,8 @@ def _plot_frequency(
     plt.figure(figsize=figsize if figsize else None)
 
     # Filter away journal entries and sort
-    events = list(sorted(filter(lambda e: e.type == "data", events)))
+    events = list(sorted(filter(lambda e: e.type == "dose", events)))
+    assert events
 
     if any_substance:
         for e in events:
@@ -391,7 +405,8 @@ def _plot_calendar(events, cmap="Reds", fillcolor="whitesmoke", **kwargs):
     import calplot
 
     # Filter away journal entries and sort
-    events = list(sorted(filter(lambda e: e.type == "data", events)))
+    events = list(sorted(filter(lambda e: e.type == "dose", events)))
+    assert events
 
     for e in events:
         e.data["substance"] = "Any"
@@ -411,9 +426,7 @@ def _plot_calendar(events, cmap="Reds", fillcolor="whitesmoke", **kwargs):
     series = series.resample("D").sum().asfreq("D")
     # print(series.tail(20))
 
-    calplot.calendarplot(
-        series, fillcolor=fillcolor, cmap=cmap, linewidth=1, fig_kws=kwargs
-    )
+    calplot.calplot(series, fillcolor=fillcolor, cmap=cmap, linewidth=1, fig_kws=kwargs)
     plt.show()
 
 

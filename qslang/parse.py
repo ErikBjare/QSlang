@@ -157,7 +157,7 @@ def parse(text: str) -> List[Event]:
                 if re_amount.match(data):
                     # Data entry
                     for entry in parse_data(data):
-                        events.append(Event(timestamp, "data", entry))
+                        events.append(Event(timestamp, "dose", entry))
                 else:
                     # Journal entry
                     events.append(Event(timestamp, "journal", {"raw": data}))
