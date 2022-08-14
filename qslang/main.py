@@ -329,7 +329,6 @@ def _sum_doses(events: List[Event], monthly=True) -> Dict[str, TValueByDate]:
             }
         )
 
-        print(period)
         for k, v in c.most_common(20):
             assert k
             print(f" - {v}")
@@ -431,12 +430,13 @@ def _plot_frequency(
     plt.show()
 
 
-def _plot_calendar(events, cmap="Reds", fillcolor="whitesmoke", **kwargs):
+def _plot_calendar(events, cmap="Reds", fillcolor="whitesmoke", figsize=None, **kwargs):
+    # suitable values for cmap: Reds, YlGn
     import calplot
 
     # Filter away journal entries and sort
     events = list(sorted(filter(lambda e: e.type == "dose", events)))
-    assert events
+    assert events, "No events found"
 
     for e in events:
         e.data["substance"] = "Any"
@@ -454,9 +454,18 @@ def _plot_calendar(events, cmap="Reds", fillcolor="whitesmoke", **kwargs):
     series = pd.Series(doses, index=labels)
     series = series[~series.index.duplicated()]
     series = series.resample("D").sum().asfreq("D")
-    # print(series.tail(20))
 
-    calplot.calplot(series, fillcolor=fillcolor, cmap=cmap, linewidth=1, fig_kws=kwargs)
+    calplot.calplot(
+        series,
+        fillcolor=fillcolor,
+        cmap=cmap,
+        linewidth=1,
+        figsize=figsize,
+        vmin=0,
+        vmax=1,
+        dropzero=False,
+        fig_kws=kwargs,
+    )
     plt.show()
 
 
