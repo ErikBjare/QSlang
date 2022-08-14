@@ -28,11 +28,11 @@ start_of_day = timedelta(hours=4)
 
 @click.group()
 @click.option("-v", "--verbose", is_flag=True)
-def qslang(verbose=False):
+def main(verbose=False):
     logging.basicConfig(level=logging.DEBUG if verbose else logging.INFO)
 
 
-@qslang.command()
+@main.command()
 @click.option(
     "--start", type=click.DateTime(["%Y-%m-%d"]), help="start date to filter events by"
 )
@@ -46,7 +46,7 @@ def events(start: datetime, end: datetime, substances: Optional[str]):
     print_events(events)
 
 
-@qslang.command()
+@main.command()
 @click.option(
     "--start", type=click.DateTime(["%Y-%m-%d"]), help="start date to filter events by"
 )
@@ -69,7 +69,7 @@ def doses(start: datetime, end: datetime, substances: str) -> None:
         print("No matching events found")
 
 
-@qslang.command()
+@main.command()
 @click.option(
     "--start", type=click.DateTime(["%Y-%m-%d"]), help="start date to filter events by"
 )
@@ -112,7 +112,7 @@ def effectspan(start: datetime, end: datetime, substances: str, normalize: str):
         print("No matching events found")
 
 
-@qslang.command()
+@main.command()
 @click.option(
     "--start", type=click.DateTime(["%Y-%m-%d"]), help="start date to filter events by"
 )
@@ -136,7 +136,7 @@ def substances(start, end, substances) -> None:
     print(f"{len(c)} substances found")
 
 
-@qslang.command()
+@main.command()
 @click.option(
     "--start", type=click.DateTime(["%Y-%m-%d"]), help="start date to filter events by"
 )
@@ -164,7 +164,7 @@ def plot(
     )
 
 
-@qslang.command()
+@main.command()
 @click.option(
     "--start", type=click.DateTime(["%Y-%m-%d"]), help="start date to filter events by"
 )
@@ -195,17 +195,35 @@ def _print_daily_doses(
         sorted(events), key=lambda e: (e.timestamp - start_of_day).date()
     )
     assert events[0].dose
+    # init outer (all days) accumulator
     tot_amt = Dose(substance, events[0].dose.quantity * 0)
     for _, v in grouped_by_date.items():
+        valid_doses = [
+            entry.dose
+            for entry in v
+            if entry.dose
+            and entry.dose.quantity.magnitude > 0
+            and entry.dose.quantity.units != "dimensionless"
+        ]
+
+        # if no valid doses, skip day
+        if not valid_doses:
+            continue
+
+        # find first non-zero non-dimensionless dose to use as accumulator
+        initdose = valid_doses[0]
+
         try:
-            assert v[0].dose
-            amt = Dose(substance, v[0].dose.quantity * 0)
+            # init inner (per day) accumulator
+            amt = Dose(substance, initdose.quantity * 0)
             for e in v:
-                if e.dose:
+                if e.dose and e.dose.quantity.magnitude > 0:
                     amt += e.dose
             tot_amt += amt
         except Exception as e:
             logger.warning(f"Unable to sum amounts '{v}', '{tot_amt}': {e}")
+            # logger.warning(f"initdose: {initdose}")
+            # logger.warning(f"dose to add: {e}")
 
     if ignore_doses_fewer_than and ignore_doses_fewer_than > len(grouped_by_date):
         return
@@ -222,12 +240,24 @@ def _print_daily_doses(
     print(f" - {len(grouped_by_date)} days totalling {tot_amt.amount_with_unit}")
     print(f" - avg dose/day: {tot_amt/len(events)}")
 
-    first_daily_dose_times: List[datetime] = [
-        min(e.timestamp - start_of_day for e in events) + start_of_day
-        for events in grouped_by_date.values()
-    ]
-    avg_time_of_first_daily_dose = mean_time([t.time() for t in first_daily_dose_times])
-    print(f" - avg time of first daily dose: {avg_time_of_first_daily_dose}")
+    firstlast_dose_times: Tuple[List[datetime], List[datetime]] = tuple(
+        zip(
+            *[
+                (
+                    min(e.timestamp - start_of_day for e in events) + start_of_day,
+                    max(e.timestamp - start_of_day for e in events) + start_of_day,
+                )
+                for events in grouped_by_date.values()
+            ]
+        )
+    )  # type: ignore
+    first_dose_times, last_dose_times = firstlast_dose_times
+
+    avg_time_of_first_dose = mean_time([t.time() for t in first_dose_times])
+    avg_time_of_last_dose = mean_time([t.time() for t in last_dose_times])
+    print(
+        f" - avg time of first/last daily dose: {avg_time_of_first_dose}/{avg_time_of_last_dose}"
+    )
 
     try:
         median_dose = statistics.median(e.dose for e in events if e.dose)  # type: ignore
@@ -431,4 +461,4 @@ def _plot_calendar(events, cmap="Reds", fillcolor="whitesmoke", **kwargs):
 
 
 if __name__ == "__main__":
-    qslang()
+    main()

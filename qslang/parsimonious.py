@@ -81,32 +81,39 @@ grammar = parsimonious.Grammar(
 )
 
 
-def parse(s: str, continue_on_err=False) -> Tuple[List[Event], List[ParseError]]:
-    if continue_on_err:
-        entries: List[Union[Event, ParseError]] = parse_continue_on_err(s)
-        events = []
-        errors = []
-        for e in entries:
-            if isinstance(e, Event):
-                if e.timestamp.date() < date(1901, 1, 1):
-                    logger.warning("No date for events")
-                events.append(e)
-            elif isinstance(e, ParseError):
-                # logger.warning(f"Error while parsing: {e}")
-                errors.append(e)
-            else:
-                print(e)
-                raise TypeError(f"Unexpected type: {type(e)}")
-        # check how many have 1900-1-1 as date
-        n_no_date = len([e for e in events if e.timestamp.date() <= date(1994, 1, 1)])
-        if n_no_date:
-            logger.warning(f"{n_no_date} events have no date")
-        return events, errors
-    else:
-        visitor = Visitor()
-        visitor.grammar = grammar
-        events: List[Event] = visitor.parse(s.strip())  # type: ignore
-        return events, []
+def parse(s: str) -> List[Event]:
+    visitor = Visitor()
+    visitor.grammar = grammar
+    events: List[Event] = visitor.parse(s.strip())  # type: ignore
+    return events
+
+
+def parse_defer_errors(s: str) -> Tuple[List[Event], List[ParseError]]:
+    """
+    Tries to parse strings into a list of events.
+    If some entries can't be read: store the resulting errors in a list.
+
+    returns both the events and errors.
+    """
+    entries: List[Union[Event, ParseError]] = _parse_continue_on_err(s)
+    events = []
+    errors = []
+    for e in entries:
+        if isinstance(e, Event):
+            if e.timestamp.date() < date(1901, 1, 1):
+                logger.warning("No date for events")
+            events.append(e)
+        elif isinstance(e, ParseError):
+            # logger.warning(f"Error while parsing: {e}")
+            errors.append(e)
+        else:
+            print(e)
+            raise TypeError(f"Unexpected type: {type(e)}")
+    # check how many have 1900-1-1 as date
+    n_no_date = len([e for e in events if e.timestamp.date() <= date(1994, 1, 1)])
+    if n_no_date:
+        logger.warning(f"{n_no_date} events have no date")
+    return events, errors
 
 
 def parse_to_node(string, rule=None) -> Node:
@@ -367,9 +374,9 @@ class Visitor(NodeVisitor):
 def test_parse_notes():
     parsed = parse("09:00 - One journal entry\n\n10:00 - Another journal entry")
     assert len(parsed) == 2
-    assert parsed[0].type == "note"
+    assert parsed[0].type == "journal"
     assert parsed[0].data == {"note": "One journal entry"}
-    assert parsed[1].type == "note"
+    assert parsed[1].type == "journal"
     assert parsed[1].data == {"note": "Another journal entry"}
 
 
@@ -631,7 +638,7 @@ def test_parse_continue_on_err():
 
     09:00 - But this should still parse to a note.
     """
-    entries = parse_continue_on_err(s)
+    entries = _parse_continue_on_err(s)
     assert len(entries) == 2
 
     # first entry is a parse error
@@ -642,7 +649,7 @@ def test_parse_continue_on_err():
     assert entries[1].timestamp == datetime(2020, 1, 1, 9, 0)
 
 
-def parse_continue_on_err(s: str) -> List[Union[Event, ParseError]]:
+def _parse_continue_on_err(s: str) -> List[Union[Event, ParseError]]:
     """
     We want to parse events row by row, so we can handle errors (which ``parse`` cannot).
 
@@ -664,11 +671,12 @@ def parse_continue_on_err(s: str) -> List[Union[Event, ParseError]]:
             continue
 
         try:
-            events, errors = parse(day_header + "\n" + line)
-            assert not errors
+            events = parse(day_header + "\n" + line)
             if events:
                 entries.extend(events)
         except Exception as e:
+            # Useful in testing to get stacktraces
+            #logger.exception(e)
             entries.append(ParseError(e, line, day_header[2:]))
 
     return entries

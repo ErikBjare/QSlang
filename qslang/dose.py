@@ -2,15 +2,24 @@
 
 import logging
 import pint
+from pint.definitions import UnitDefinition, ScaleConverter
 from typing import Union, Any
 
 
 log = logging.getLogger(__name__)
 
 
-ureg = pint.UnitRegistry()
+ureg = pint.UnitRegistry(
+    preprocessors=[
+        lambda s: s.replace("%", "percent"),
+        lambda s: s.replace("%%", "permille"),
+    ]
+)
+
 ureg.define("micro- = 10**-6 = mc- = μ-")
-ureg.define("micro- = 10**-6 = mc- = μ-")
+
+ureg.define(UnitDefinition("permille", "%%", (), ScaleConverter(0.001)))
+ureg.define(UnitDefinition("percent", "%", (), ScaleConverter(0.01)))
 
 ureg.define("cup = 2*dl")
 
@@ -18,6 +27,8 @@ ureg.define("cup = 2*dl")
 ureg.define("x = count")
 ureg.define("IU = x")  # for now
 ureg.define("CFU = x")  # for now
+ureg.define("unknown = x")  # for now
+ureg.define("serving = x")  # for now
 
 ureg.define("B = 10**9 * x")  # for noting billions of CFU, for example
 
@@ -29,8 +40,9 @@ class Dose:
     def __init__(self, substance: str, amount: Union[str, Q_]) -> None:
         self.substance: str = substance
         if not isinstance(amount, ureg.Quantity):
-            amount = Q_(amount)
-        self.quantity = amount
+            self.quantity = Q_(amount)
+        else:
+            self.quantity = amount
 
     def __str__(self) -> str:
         return f"{self.amount_with_unit} {self.substance}"

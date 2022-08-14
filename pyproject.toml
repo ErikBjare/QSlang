@@ -9,7 +9,7 @@ packages = [
 ]
 
 [tool.poetry.scripts]
-qslang = "qslang:__main__"
+qslang = "qslang.main:main"
 
 [tool.poetry.dependencies]
 python = "^3.9"

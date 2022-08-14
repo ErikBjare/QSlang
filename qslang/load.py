@@ -4,14 +4,13 @@ import os
 import re
 import logging
 import json
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Union, Literal
 from pathlib import Path
 from collections import defaultdict
 from datetime import datetime
 
 from .event import Event
-from .parse import re_date
-from .parsimonious import parse
+from .parsimonious import parse_defer_errors
 from .config import load_config
 from .filter import filter_events
 from .preprocess import _alcohol_preprocess
@@ -19,6 +18,7 @@ from .preprocess import _alcohol_preprocess
 
 logger = logging.getLogger(__name__)
 
+re_date = re.compile(r"[0-9]{4}-[0-9]{1,2}-[0-9]{1,2}")
 re_evernote_author = re.compile(r">author:(.+)$")
 re_evernote_source = re.compile(r">source:(.+)$")
 
@@ -26,47 +26,47 @@ re_evernote_source = re.compile(r">source:(.+)$")
 base_dir = os.path.dirname(__file__)
 
 
-def load_notes(notes: List[str]) -> List[Event]:
-    """
-    Load events from raw notes.
-
-    - Collects errors
-    - Deals with duplicates
-    """
-    events = []
-    errors = []
-    for note in notes:
-        note_events, note_errors = parse(note, continue_on_err=True)
-        events += note_events
-        errors += note_errors
-    if errors:
-        logger.warning("Parsed %d notes with %d errors", len(events), len(errors))
-        total = len(events) + len(errors)
-        logger.warning(
-            f"Found {len(errors)} ({len(errors) / total * 100:.2f}%) errors when parsing {total} notes"
-        )
-
-    # remove duplicate events
-    events_pre = len(events)
-    events = list(set(events))
-    if len(events) != events_pre:
-        logger.warning("Removed duplicate events: %d -> %d", events_pre, len(events))
-
-    return events
-
-
 def load_events(
-    start: datetime = None, end: datetime = None, substances: List[str] = []
+    start: datetime = None,
+    end: datetime = None,
+    substances: List[str] = [],
+    sources: Optional[
+        List[Union[Literal["standardnotes"], Literal["evernote"], Literal["example"]]]
+    ] = None,
 ) -> List[Event]:
+    """
+    Load events from various sources.
+
+    Sources can be:
+    - standardnotes
+    - evernote
+    - example
+
+    If set to None, all sources will be attempted.
+    """
     events: List[Event] = []
 
     # NOTE: Many notes are duplicated (due to conflicts),
     # so we will end up with duplcate events that we have to deal with.
-    logger.info("Loading standardnotes notes")
-    events += load_notes(_load_standardnotes_export())
 
-    logger.info("Loading standardnotes notes")
-    events += load_notes(_load_evernote())
+    if sources is None or "standardnotes" in sources:
+        logger.info("Loading standardnotes...")
+        new_events = notes_to_events(_load_standardnotes_export())
+        logger.info(f"Loaded {len(new_events)} from standardnotes")
+        events += new_events
+
+    if sources is None or "evernote" in sources:
+        logger.info("Loading evernote...")
+        new_events = notes_to_events(_load_evernotes())
+        logger.info(f"Loaded {len(new_events)} from evernote")
+        events += new_events
+
+    if not events:
+        logger.warning("No events found, falling back to example data")
+    if not events or (sources and "example" in sources):
+        new_events = notes_to_events(_load_example_notes())
+        logger.info(f"Loaded {len(new_events)} from example data")
+        events += new_events
 
     events = _extend_substance_abbrs(events)
     events = _tag_substances(events)
@@ -86,6 +86,38 @@ def load_events(
     return events
 
 
+def notes_to_events(notes: List[str]) -> List[Event]:
+    """
+    Turns raw notes into events
+
+    - Collects errors
+    - Deals with duplicates
+    """
+    logger.debug("Converting to events...")
+    events = []
+    errors = []
+    for note in notes:
+        note_events, note_errors = parse_defer_errors(note)
+        events += note_events
+        errors += note_errors
+    if errors:
+        total = len(events) + len(errors)
+        logger.warning(
+            f"Found {len(errors)} ({len(errors) / total * 100:.2f}%) errors when parsing {total} notes"
+        )
+        # logger.warning("First 3 errors")
+        # for e in errors[:3]:
+        #     logger.exception(e)
+
+    # remove duplicate events
+    events_pre = len(events)
+    events = list(set(events))
+    if len(events) != events_pre:
+        logger.warning("Removed duplicate events: %d -> %d", events_pre, len(events))
+
+    return events
+
+
 def _get_export_file() -> Optional[Path]:
     config = load_config()
     p = config.get("data", {}).get("standardnotes_export", None)
@@ -101,7 +133,7 @@ def _load_standardnotes_export() -> List[str]:
         logger.warning("no standardnotes export in config")
         return []
 
-    print(f"Loading standardnotes from {path}")
+    logger.info(f"Loading standardnotes from {path}")
     notes = []
     with open(path) as f:
         data = json.load(f)
@@ -125,26 +157,39 @@ def _load_standardnotes_export() -> List[str]:
     return notes
 
 
-def _load_standardnotes_fs() -> List[str]:
+def _load_dir_notes(path: Path) -> List[str]:
+    """
+    This used to be called _load_standardnotes_fs,
+    as it was used when standardnotes-fs was still functional.
+
+    However, it was repurposed as it generalizes well.
+    """
     notes = []
-    p = Path("/home/erb/notes-git/notes")
-    for path in p.glob("*.md"):
-        title = path.name.split(".")[0]
+    for p in path.glob("*.md"):
+        title = p.name.split(".")[0]
         if re_date.match(title):
-            with open(path, "r") as f:
+            with open(p, "r") as f:
                 text = f.read()
                 # print(title)
                 # print(text)
-                notes.append(f"# {title}\n\n{text}")
+                if text.startswith("#"):
+                    notes.append(text)
+                else:
+                    notes.append(f"# {title}\n\n{text}")
         else:
             logger.debug("Unknown note type")
             # print(entry["content"])
 
+    return notes
+
+
+def _load_example_notes() -> List[str]:
+    notes = _load_dir_notes(Path(base_dir) / ".." / "data" / "test" / "notes")
     assert notes
     return notes
 
 
-def _load_evernote() -> List[str]:
+def _load_evernotes() -> List[str]:
     notes = []
     d = Path("./data/private/Evernote")
     dateset = set()
@@ -236,7 +281,6 @@ def _extend_substance_abbrs(events) -> List[Event]:
 
 
 def test_load_events():
-    events = load_events()
-    if _get_export_file() is not None:
-        assert len(events) > 0
+    events = load_events(sources=["example"])
     print(f"Loaded {len(events)} events")
+    assert events
