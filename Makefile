@@ -5,11 +5,7 @@ test:
 	poetry run pytest --cov=qslang
 
 test-integration:
-	qslang doses --substances Noopept
-	qslang events --substances Noopept
-	qslang plot --substances Noopept
-	qslang plot --count --substances Noopept
-	qslang plot --days --substances Noopept
+	poetry run ./test-integration.sh
 
 data/generated/effectspan-caffeine.csv:
 	poetry run python3 -m qslang effectspan --substances caffeine > $@

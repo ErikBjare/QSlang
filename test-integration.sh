@@ -29,3 +29,8 @@ qslang effectspan --substances caffeine
 qslang plot --substances caffeine
 qslang plot-calendar --substances caffeine
 qslang plot-effectspan --substances caffeine
+
+# old tests
+qslang plot --substances caffeine
+qslang plot --count --substances caffeine
+qslang plot --days --substances caffeine

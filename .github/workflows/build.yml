@@ -28,10 +28,14 @@ jobs:
         pip install poetry
         poetry install
 
-    - name: Run tests
+    - name: Run unit tests
       run: |
         make test
         bash <(curl -s https://codecov.io/bash)
+
+    - name: Run integration tests
+      run: |
+        make test-integration
 
   typecheck:
     runs-on: ubuntu-latest
