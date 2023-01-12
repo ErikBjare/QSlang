@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict
+import logging
 
 import numpy as np
 import pandas as pd
@@ -7,6 +8,9 @@ import matplotlib.pyplot as plt
 
 from aw_core import Event
 from . import Dose
+
+
+logger = logging.getLogger(__name__)
 
 
 def compute_plasma(doses: list[tuple[datetime, Dose]]):
@@ -77,7 +81,8 @@ def effectspan_substance(doses: list[tuple[datetime, Dose]]) -> list[Event]:
     assert all(dose.substance.lower() == subst for (_, dose) in doses)
 
     # assert we have duration data for the substance
-    assert subst in subst_durations
+    if subst not in subst_durations:
+        raise ValueError(f"Unknown effect duration for substance: {subst}")
 
     # sort
     doses = sorted(doses, key=lambda x: x[0])
@@ -121,7 +126,10 @@ def effectspan(doses: list[tuple[datetime, Dose]]) -> list[Event]:
     # Compute effectspan for each substance
     events = []
     for substance, doses in groups.items():
-        events.extend(effectspan_substance(doses))
+        try:
+            events.extend(effectspan_substance(doses))
+        except ValueError as e:
+            logger.warning(f"Failed to compute effectspan for {substance}: {e}")
 
     return events
 
@@ -147,5 +155,5 @@ def test_effectspan():
 
 
 if __name__ == "__main__":
-    # example()
     test_effectspan()
+    example()

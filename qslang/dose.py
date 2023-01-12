@@ -67,6 +67,11 @@ class Dose:
 
     def __add__(self, other: "Dose") -> "Dose":
         if self.quantity.units.dimensionality != other.quantity.units.dimensionality:
+            # if quantity of either is 0, we skip it
+            if self.quantity.magnitude == 0:
+                return other
+            if other.quantity.magnitude == 0:
+                return self
             raise ValueError(
                 f"Cannot add doses with different units: {self.quantity.units} and {other.quantity.units} (for {self} and {other})"
             )

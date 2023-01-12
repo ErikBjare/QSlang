@@ -32,7 +32,7 @@ def main(verbose=False):
     logging.basicConfig(level=logging.DEBUG if verbose else logging.INFO)
 
 
-@main.command()
+@main.command(help="print list of all doses")
 @click.option(
     "--start", type=click.DateTime(["%Y-%m-%d"]), help="start date to filter events by"
 )
@@ -46,7 +46,7 @@ def events(start: datetime, end: datetime, substances: Optional[str]):
     print_events(events)
 
 
-@main.command()
+@main.command(help="print summary of doses for each substance")
 @click.option(
     "--start", type=click.DateTime(["%Y-%m-%d"]), help="start date to filter events by"
 )
@@ -55,6 +55,7 @@ def events(start: datetime, end: datetime, substances: Optional[str]):
 )
 @click.option("--substances", help="substances to filter by (comma-separated)")
 def doses(start: datetime, end: datetime, substances: str) -> None:
+    # TODO: rename function to something more descriptive, like 'summary'?
     substances_list = substances.split(",") if substances else []
     events = load_events(start, end, substances_list)
     events = [e for e in events if e.substance]
@@ -69,7 +70,7 @@ def doses(start: datetime, end: datetime, substances: str) -> None:
         print("No matching events found")
 
 
-@main.command()
+@main.command(help="print effect spans")
 @click.option(
     "--start", type=click.DateTime(["%Y-%m-%d"]), help="start date to filter events by"
 )
@@ -112,7 +113,7 @@ def effectspan(start: datetime, end: datetime, substances: str, normalize: str):
         print("No matching events found")
 
 
-@main.command()
+@main.command(help="plot effect spans in a barchart")
 @click.option(
     "--start", type=click.DateTime(["%Y-%m-%d"]), help="start date to filter events by"
 )
@@ -120,23 +121,124 @@ def effectspan(start: datetime, end: datetime, substances: str, normalize: str):
     "--end", type=click.DateTime(["%Y-%m-%d"]), help="end date to filter events by"
 )
 @click.option("--substances", help="substances to filter by (comma-separated)")
-def substances(start, end, substances) -> None:
+def plot_effectspan(start, end, substances):
     substances_list = substances.split(",") if substances else []
     events = load_events(start, end, substances_list)
+    events = [e for e in events if e.substance]
+
+    bars_by_substance = {}
+
+    if events:
+        effectspans = _effectspan(
+            [
+                (e.timestamp.replace(tzinfo=timezone.utc), e.dose)
+                for e in events
+                if e.dose
+            ]
+        )
+
+        # now that we have effectspans, we need to plot each span in a bar diagram
+        # there can be multiple spans per day
+        # we will build the bars grouped by substance
+
+        for substance in set([span.data["substance"] for span in effectspans]):
+            # list of bars, with (x, y_start, duration) for each bar
+            bars = []
+            for span in effectspans:
+                if span.data["substance"] == substance:
+                    bars.append(
+                        (
+                            span.timestamp.date(),
+                            span.timestamp.time(),
+                            span.duration,
+                        )
+                    )
+
+            # split bars crossing the 24h mark
+            for bar in bars:
+                from datetime import time
+
+                bar_end_hour = bar[1].hour + bar[2].total_seconds() / 3600
+                if bar_end_hour > 24:
+                    # create a new bar for the time past midnight
+                    bars.append(
+                        (
+                            bar[0] + timedelta(days=1),
+                            time(0, 0),
+                            timedelta(hours=bar_end_hour - 24),
+                        )
+                    )
+                    # shorten the original bar
+                    bars[bars.index(bar)] = (
+                        bar[0],
+                        bar[1],
+                        timedelta(hours=24 - bar[1].hour),
+                    )
+
+            # transform to (x, height, bottom) for each bar
+            bars_mpl = [
+                (x, duration.total_seconds() / 3600, y_start.hour + y_start.minute / 60)
+                for x, y_start, duration in bars
+            ]
+            bars_by_substance[substance] = bars_mpl
+
+        # plot
+        fig, ax = plt.subplots()
+        ax.set_xlabel("Date")
+        ax.set_ylabel("Hour")
+
+        for subst, bars in bars_by_substance.items():
+            x, height, bottom = zip(*bars)
+            ax.bar(
+                x,
+                height,
+                bottom=bottom,
+                label=subst,
+            )
+        # ax.bar(x, height, bottom=bottom)
+        # invert axis such that each day starts at the top
+        ax.set_ylim(0, 24)
+        ax.invert_yaxis()
+        plt.legend()
+        plt.show()
+
+
+@main.command(help="print list of substances")
+@click.option(
+    "--start", type=click.DateTime(["%Y-%m-%d"]), help="start date to filter events by"
+)
+@click.option(
+    "--end", type=click.DateTime(["%Y-%m-%d"]), help="end date to filter events by"
+)
+@click.option("--substances", help="substances to filter by (comma-separated)")
+@click.option(
+    "--group-day",
+    is_flag=True,
+    help="group by day, counting each day with a dose instead of each dose",
+)
+def substances(start, end, substances, group_day=True) -> None:
+    substances_list = substances.split(",") if substances else []
+    events = load_events(start, end, substances_list)
+    # group by substance
+    # then, if group_day, group by day and then count number of days
     c = Counter(
         {
             k: len(v)
+            if not group_day
+            else len({d for d in [e.timestamp.date() for e in v if e.timestamp.date()]})
             for k, v in igroupby(
-                [e for e in events if e.substance], lambda e: e.substance
+                [e for e in events if e.substance],
+                lambda e: e.substance,
             ).items()
         }
     )
+
     for s, n in c.most_common():
         print(f"{n}x\t{s}")
     print(f"{len(c)} substances found")
 
 
-@main.command()
+@main.command(help="plot doses over time in a barchart")
 @click.option(
     "--start", type=click.DateTime(["%Y-%m-%d"]), help="start date to filter events by"
 )
@@ -164,7 +266,7 @@ def plot(
     )
 
 
-@main.command()
+@main.command(help="plot doses in a calendar")
 @click.option(
     "--start", type=click.DateTime(["%Y-%m-%d"]), help="start date to filter events by"
 )
@@ -351,20 +453,16 @@ def _count_doses(
     for period in grouped_by_date.keys():
         events = grouped_by_date[period]
         grouped_by_substance = igroupby(events, key=lambda e: e.substance)
-        if one_per_day:
-            c = Counter(
-                {
-                    substance: len({(e.timestamp + day_offset).date() for e in events})
-                    for substance, events in grouped_by_substance.items()
-                }
-            )
-        else:
-            c = Counter(
-                {
-                    substance: len(events)
-                    for substance, events in grouped_by_substance.items()
-                }
-            )
+        c = Counter(
+            {
+                substance: (
+                    len({(e.timestamp + day_offset).date() for e in events})
+                    if one_per_day
+                    else len(events)
+                )
+                for substance, events in grouped_by_substance.items()
+            }
+        )
         unit = " days" if one_per_day else "x"
 
         if verbose:
@@ -416,13 +514,18 @@ def _plot_frequency(
     if daily:
         labels = dayrange(min(labels), max(labels))
     else:
-        labels = [(m[0], m[1], 0) for m in monthrange(min(labels)[:2], max(labels)[:2])]
-    labels_str = ["-".join([str(n) for n in t if n]) for t in labels]
+        labels = [(m[0], m[1], 1) for m in monthrange(min(labels)[:2], max(labels)[:2])]
+    labels_date = [datetime(*t) for t in labels]
 
     stackheight = np.zeros(len(labels))
     for substance, value_by_date in period_counts.items():
-        n = [value_by_date[label] if label in value_by_date else 0 for label in labels]
-        plt.bar(labels_str, n, label=substance, bottom=stackheight)
+        n = [
+            value_by_date.get(label if daily else (*label[:2], None), 0)
+            for label in labels
+        ]
+        # check that n is not all zeros (indication of indexing error)
+        assert any(n)
+        plt.bar(labels_date, n, label=substance, bottom=stackheight)
         stackheight += np.array(n)
 
     plt.xticks(rotation="vertical")
