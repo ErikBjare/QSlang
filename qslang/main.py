@@ -552,7 +552,7 @@ def _plot_frequency(
     any_substance=False,
     daily=False,
     verbose=False,
-    figsize: tuple[int, int] = None,
+    figsize: tuple[int, int] | None = None,
 ):
     """
     Should plot frequency of use over time

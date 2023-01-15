@@ -1,10 +1,9 @@
 #!/bin/env python3
 
 import logging
-import pint
-from pint.definitions import UnitDefinition, ScaleConverter
 from typing import Any
 
+import pint
 
 log = logging.getLogger(__name__)
 
@@ -17,9 +16,9 @@ ureg = pint.UnitRegistry(
 )
 
 ureg.define("micro- = 10**-6 = mc- = μ-")
+ureg.define("percent = 0.01 = %")
+ureg.define("permille = 0.001 = %%")
 
-ureg.define(UnitDefinition("permille", "%%", (), ScaleConverter(0.001)))
-ureg.define(UnitDefinition("percent", "%", (), ScaleConverter(0.01)))
 
 ureg.define("cup = 2*dl")
 
@@ -35,7 +34,7 @@ ureg.define("puffs = x")  # for now
 ureg.define("B = 10**9 * x")  # for noting billions of CFU, for example
 
 # The type here is because mypy doesn't like this dynamically created type
-Q_ = ureg.Quantity  # type: Any
+Q_: Any = ureg.Quantity
 
 
 class Dose:

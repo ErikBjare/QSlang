@@ -25,6 +25,11 @@ format:
 pyupgrade:
 	poetry run pyupgrade --py310-plus ${SRCFILES}
 
+precommit:
+	make format
+	make pyupgrade
+	make typecheck
+
 data/private/Evernote:
 	cd thirdparty/evernote-dump/source/ && \
 		python run_script.py ../../../data/private/Evernote.enex && \

@@ -27,8 +27,8 @@ base_dir = os.path.dirname(__file__)
 
 
 def load_events(
-    start: datetime = None,
-    end: datetime = None,
+    start: datetime | None = None,
+    end: datetime | None = None,
     substances: list[str] = [],
     sources: None
     | (
