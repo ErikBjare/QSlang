@@ -6,11 +6,11 @@ QSlang
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![Typechecking: Mypy](http://www.mypy-lang.org/static/mypy_badge.svg)](http://mypy-lang.org/)
 
-A text-based language for manual entry of quantified self data.
+A tool to parse and analyze drug logs, for science. 
 
-Useful for logging in a flexible textual format which allows for interleaving of partially structured data to later be structured. Input on phones/touch devices is surprisingly efficient when used with sentence-predicting keyboards (like Swiftkey etc).
+Uses a domain-specific language for manual entry of drug doses and accompanying journal/plaintext entries in a flexible textual format, which can then be used to analyze use of drugs/supplements/pharmaceuticals. Input on phones/touch devices is surprisingly efficient when used with sentence-predicting keyboards (like Swiftkey etc).
 
-Built with parsimonious (to parse notes) and pint (to handle units).
+Built with [parsimonious](https://github.com/erikrose/parsimonious) (to parse notes) and [pint](https://github.com/hgrecco/pint) (to handle units).
 
 Pronounced: Q-Slang
 
