@@ -37,7 +37,7 @@ Q_ = ureg.Quantity  # type: Any
 
 
 class Dose:
-    def __init__(self, substance: str, amount: Union[str, Q_]) -> None:
+    def __init__(self, substance: str, amount: str | Q_) -> None:
         self.substance: str = substance
         if not isinstance(amount, ureg.Quantity):
             self.quantity = Q_(amount)

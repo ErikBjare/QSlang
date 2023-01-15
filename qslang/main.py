@@ -48,7 +48,7 @@ def main(verbose=False, testing=True):
     "--end", type=click.DateTime(["%Y-%m-%d"]), help="end date to filter events by"
 )
 @click.option("--substances", help="substances to filter by (comma-separated)")
-def events(start: datetime, end: datetime, substances: Optional[str]):
+def events(start: datetime, end: datetime, substances: str | None):
     substances_list = substances.split(",") if substances else []
     events = load_events(start, end, substances_list)
     print_events(events)
@@ -149,7 +149,7 @@ def plot_effectspan(start, end, substances):
         # there can be multiple spans per day
         # we will build the bars grouped by substance
 
-        for substance in set([span.data["substance"] for span in effectspans]):
+        for substance in {span.data["substance"] for span in effectspans}:
             # list of bars, with (x, y_start, duration) for each bar
             bars = []
             for span in effectspans:
@@ -259,8 +259,8 @@ def substances(start, end, substances, group_day=True) -> None:
 @click.option("--count", is_flag=True, help="count number of doses instead of amount")
 @click.option("--days", is_flag=True, help="count number of days with doses")
 def plot(
-    start: Optional[datetime],
-    end: Optional[datetime],
+    start: datetime | None,
+    end: datetime | None,
     substances: str,
     any: bool,
     daily: bool,
@@ -282,14 +282,14 @@ def plot(
     "--end", type=click.DateTime(["%Y-%m-%d"]), help="end date to filter events by"
 )
 @click.option("--substances", help="substances to filter by (comma-separated)")
-def plot_calendar(start: Optional[datetime], end: Optional[datetime], substances: str):
+def plot_calendar(start: datetime | None, end: datetime | None, substances: str):
     substances_list = substances.split(",") if substances else []
     events = load_events(start, end, substances_list)
     _plot_calendar(events)
 
 
 def _print_daily_doses(
-    events: List[Event], substance: str, ignore_doses_fewer_than=None
+    events: list[Event], substance: str, ignore_doses_fewer_than=None
 ):
     events = [
         e
@@ -350,7 +350,7 @@ def _print_daily_doses(
     print(f" - {len(grouped_by_date)} days totalling {tot_amt.amount_with_unit}")
     print(f" - avg dose/day: {tot_amt/len(events)}")
 
-    firstlast_dose_times: Tuple[List[datetime], List[datetime]] = tuple(
+    firstlast_dose_times: tuple[list[datetime], list[datetime]] = tuple(
         zip(
             *[
                 (
@@ -386,13 +386,13 @@ def _print_daily_doses(
         print(f"   - {roa.ljust(10)}  n: {len(grouped_by_roa[roa])}")
 
 
-TDate = Tuple[int, int, Optional[int]]
+TDate = tuple[int, int, Optional[int]]
 
 day_offset = timedelta(hours=-4)
 
 
-def _grouped_by_date(events: List[Event], monthly=True) -> Dict[TDate, List[Event]]:
-    grouped_by_date: Dict[Tuple[int, int, Optional[int]], List[Event]] = defaultdict(
+def _grouped_by_date(events: list[Event], monthly=True) -> dict[TDate, list[Event]]:
+    grouped_by_date: dict[tuple[int, int, int | None], list[Event]] = defaultdict(
         list
     )
     for period, events_grouped in groupby(
@@ -407,7 +407,7 @@ def _grouped_by_date(events: List[Event], monthly=True) -> Dict[TDate, List[Even
     return grouped_by_date
 
 
-TValueByDate = Dict[TDate, float]
+TValueByDate = dict[TDate, float]
 
 
 def _dosesum(doses):
@@ -420,12 +420,12 @@ def _dosesum(doses):
     return acc
 
 
-def _sum_doses(events: List[Event], monthly=True) -> Dict[str, TValueByDate]:
+def _sum_doses(events: list[Event], monthly=True) -> dict[str, TValueByDate]:
     substances = {e.substance for e in events if e.substance}
     events = [e for e in events if e.dose]
     grouped_by_date = _grouped_by_date(events, monthly=monthly)
 
-    period_counts: Dict[str, Dict[TDate, float]] = defaultdict(
+    period_counts: dict[str, dict[TDate, float]] = defaultdict(
         lambda: defaultdict(float)
     )
     for period in grouped_by_date.keys():
@@ -450,12 +450,12 @@ def _sum_doses(events: List[Event], monthly=True) -> Dict[str, TValueByDate]:
 
 
 def _count_doses(
-    events: List[Event], one_per_day=True, monthly=True, verbose=False
-) -> Dict[str, TValueByDate]:
+    events: list[Event], one_per_day=True, monthly=True, verbose=False
+) -> dict[str, TValueByDate]:
     substances = {e.substance for e in events if e.substance}
     grouped_by_date = _grouped_by_date(events, monthly=monthly)
 
-    period_counts: Dict[str, Dict[TDate, float]] = defaultdict(
+    period_counts: dict[str, dict[TDate, float]] = defaultdict(
         lambda: defaultdict(float)
     )
     for period in grouped_by_date.keys():
@@ -491,7 +491,7 @@ def _plot_frequency(
     any_substance=False,
     daily=False,
     verbose=False,
-    figsize: Tuple[int, int] = None,
+    figsize: tuple[int, int] = None,
 ):
     """
     Should plot frequency of use over time
@@ -514,7 +514,7 @@ def _plot_frequency(
     else:
         period_counts = _sum_doses(events, monthly=not daily)
 
-    labels: List[Tuple[int, int, int]] = [
+    labels: list[tuple[int, int, int]] = [
         (date[0], date[1], date[2] or 0)
         for sd in period_counts
         for date in period_counts[sd].keys()

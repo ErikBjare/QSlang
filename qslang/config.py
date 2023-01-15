@@ -41,7 +41,7 @@ def load_config(testing=False):
         filepath = rootdir / "config.toml.example"
 
     logger.info(f"Using config file at {filepath}")
-    with open(filepath, "r") as f:
+    with open(filepath) as f:
         config = toml.load(f)
     _config = config
     return config

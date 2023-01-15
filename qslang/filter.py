@@ -4,7 +4,7 @@ from datetime import datetime
 from qslang import Event
 
 
-def filter_events_by_args(events: List[Event], args: List[str]) -> List[Event]:
+def filter_events_by_args(events: list[Event], args: list[str]) -> list[Event]:
     if not args:
         raise ValueError("Missing argument")
 

@@ -7,7 +7,8 @@ We will comment step by step how the parser works.
 
 import logging
 import pytest
-from typing import List, Dict, Any, Generator, Union, Tuple
+from typing import List, Dict, Any, Union, Tuple
+from collections.abc import Generator
 from datetime import time, date, datetime, timedelta
 
 import parsimonious
@@ -19,7 +20,7 @@ from .event import Event
 logger = logging.getLogger(__name__)
 
 
-def flatten(ls: List[Any]) -> List[Any]:
+def flatten(ls: list[Any]) -> list[Any]:
     """Flatten a list of lists."""
     if not isinstance(ls, list):
         raise TypeError("Expected a list")
@@ -81,21 +82,21 @@ grammar = parsimonious.Grammar(
 )
 
 
-def parse(s: str) -> List[Event]:
+def parse(s: str) -> list[Event]:
     visitor = Visitor()
     visitor.grammar = grammar
-    events: List[Event] = visitor.parse(s.strip())  # type: ignore
+    events: list[Event] = visitor.parse(s.strip())  # type: ignore
     return events
 
 
-def parse_defer_errors(s: str) -> Tuple[List[Event], List[ParseError]]:
+def parse_defer_errors(s: str) -> tuple[list[Event], list[ParseError]]:
     """
     Tries to parse strings into a list of events.
     If some entries can't be read: store the resulting errors in a list.
 
     returns both the events and errors.
     """
-    entries: List[Union[Event, ParseError]] = _parse_continue_on_err(s)
+    entries: list[Event | ParseError] = _parse_continue_on_err(s)
     events = []
     errors = []
     for e in entries:
@@ -140,12 +141,12 @@ def parse_entries(s: str) -> Generator[Node, None, None]:
 
 
 class Visitor(NodeVisitor):
-    def generic_visit(self, node, visited_children) -> List:
+    def generic_visit(self, node, visited_children) -> list:
         if node.expr_name:
             logger.warning(f"GENERIC HIT: {node.expr_name}   {visited_children}")
         return visited_children
 
-    def visit_entries(self, node, visited_children) -> List[Event]:
+    def visit_entries(self, node, visited_children) -> list[Event]:
         day_header, _, entries = visited_children
         day = None
 
@@ -155,7 +156,7 @@ class Visitor(NodeVisitor):
             assert isinstance(day, date)
 
         # Parse all entries
-        events: List[Event] = []
+        events: list[Event] = []
         for entry in entries:
             for event in entry:
                 if event:
@@ -173,7 +174,7 @@ class Visitor(NodeVisitor):
 
         return events
 
-    def visit_entry(self, node, visited_children, day=None) -> List[Event]:
+    def visit_entry(self, node, visited_children, day=None) -> list[Event]:
         _, time_prefix, time, _, _, _, entries, _, _ = visited_children
 
         if day is None:
@@ -214,7 +215,7 @@ class Visitor(NodeVisitor):
     def visit_unknown(self, node, visited_children) -> str:
         return "unknown"
 
-    def visit_entry_data(self, node, visited_children) -> List[Dict[str, Any]]:
+    def visit_entry_data(self, node, visited_children) -> list[dict[str, Any]]:
         doses_or_note = visited_children[0]
         if isinstance(doses_or_note, list):
             return doses_or_note
@@ -223,7 +224,7 @@ class Visitor(NodeVisitor):
         else:
             raise ValueError(f"Unknown entry data: {doses_or_note}")
 
-    def visit_extra_data(self, node, visited_children) -> Dict:
+    def visit_extra_data(self, node, visited_children) -> dict:
         _notes = []
         _subdoses = []
         for child in visited_children:
@@ -242,7 +243,7 @@ class Visitor(NodeVisitor):
         extra_data = {"notes": _notes, "subdoses": _subdoses}
         return extra_data
 
-    def visit_dose_list(self, node, visited_children) -> List[Dict[str, Any]]:
+    def visit_dose_list(self, node, visited_children) -> list[dict[str, Any]]:
         first_dose, more_doses = visited_children
         doses = [first_dose]
         for c in more_doses:
@@ -253,7 +254,7 @@ class Visitor(NodeVisitor):
         assert all(isinstance(d, dict) for d in doses)
         return doses
 
-    def visit_dose(self, node, visited_children) -> Dict[str, Any]:
+    def visit_dose(self, node, visited_children) -> dict[str, Any]:
         patient, _, dose, _, substance, a1, extras, a2, roa = visited_children
         assert a1 is None
         assert a2 is None
@@ -290,7 +291,7 @@ class Visitor(NodeVisitor):
             return time(0, 0)
         return datetime.strptime(node.text, "%H:%M").time()
 
-    def visit_extra(self, node, visited_children) -> List:
+    def visit_extra(self, node, visited_children) -> list:
         _, extra, *more = visited_children
         if more:
             more, _ = more
@@ -317,7 +318,7 @@ class Visitor(NodeVisitor):
     def visit_baseunit(self, node, visited_children) -> str:
         return node.text
 
-    def visit_amount(self, node, visited_children) -> Dict[str, Any]:
+    def visit_amount(self, node, visited_children) -> dict[str, Any]:
         visited_children = visited_children[0]
         if len(visited_children) == 4:
             (approx, amount, _, unit) = visited_children
@@ -352,7 +353,7 @@ class Visitor(NodeVisitor):
     def visit_patient(self, node, visited_children) -> str:
         return node.text[1:-1]
 
-    def visit_percent(self, node, visited_children) -> Dict[str, Any]:
+    def visit_percent(self, node, visited_children) -> dict[str, Any]:
         return {"note": node.text}
 
     def visit_fraction(self, node, visited_children) -> float:
@@ -649,7 +650,7 @@ def test_parse_continue_on_err():
     assert entries[1].timestamp == datetime(2020, 1, 1, 9, 0)
 
 
-def _parse_continue_on_err(s: str) -> List[Union[Event, ParseError]]:
+def _parse_continue_on_err(s: str) -> list[Event | ParseError]:
     """
     We want to parse events row by row, so we can handle errors (which ``parse`` cannot).
 
@@ -657,7 +658,7 @@ def _parse_continue_on_err(s: str) -> List[Union[Event, ParseError]]:
     determined by previous day header. If an event cannot be read, return an 'ParseError'
     instead, for filtering by the caller.
     """
-    entries: List[Union[Event, ParseError]] = []
+    entries: list[Event | ParseError] = []
     day_header = ""
     for line in s.splitlines():
         line = line.strip()

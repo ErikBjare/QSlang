@@ -11,7 +11,7 @@ _alcohol_conc_assumptions = {
 }
 
 
-def _alcohol_preprocess(events: List[Event]) -> List[Event]:
+def _alcohol_preprocess(events: list[Event]) -> list[Event]:
     for e in events:
         if not e.substance or not e.dose:
             continue

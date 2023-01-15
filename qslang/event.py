@@ -3,7 +3,8 @@
 import logging
 import json
 from copy import copy
-from typing import List, Dict, Any, Optional, Hashable, Union, Literal
+from typing import List, Dict, Any, Optional, Union, Literal
+from collections.abc import Hashable
 from datetime import datetime
 
 from dataclasses import dataclass, field
@@ -30,22 +31,22 @@ def _freeze(obj: Any) -> Any:
 @dataclass(order=True)
 class Event:
     timestamp: datetime
-    type: Union[Literal["dose"], Literal["journal"]]
+    type: Literal["dose"] | Literal["journal"]
     data: dict = field(compare=False)
 
     def __hash__(self):
         return hash((self.timestamp, self.type, _freeze(self.data)))
 
     @property
-    def tags(self) -> List[str]:
+    def tags(self) -> list[str]:
         return self.data["tags"] if "tags" in self.data else []
 
     @property
-    def substance(self) -> Optional[str]:
+    def substance(self) -> str | None:
         return self.data["substance"] if "substance" in self.data else None
 
     @property
-    def dose(self) -> Optional[Dose]:
+    def dose(self) -> Dose | None:
         if self.type == "dose":
             try:
                 assert self.substance
@@ -59,7 +60,7 @@ class Event:
             return None
 
     @property
-    def amount(self) -> Optional[float]:
+    def amount(self) -> float | None:
         """Returns the amount with unit, or None"""
         try:
             assert "dose" in self.data
@@ -96,7 +97,7 @@ class Event:
         print(f"{self.timestamp.isoformat()} | {self.type.ljust(7)} | " + e_str)
 
     @property
-    def json_dict(self) -> Dict[str, Any]:
+    def json_dict(self) -> dict[str, Any]:
         return {"timestamp": self.timestamp, "type": self.type, "data": self.data}
 
     @property
@@ -104,8 +105,8 @@ class Event:
         return json.dumps(self.json_dict)
 
 
-def print_events(events: List[Event]) -> None:
-    last_date: Optional[datetime] = None
+def print_events(events: list[Event]) -> None:
+    last_date: datetime | None = None
     for e in events:
         if last_date and last_date.date() != e.timestamp.date():
             print(

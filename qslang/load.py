@@ -29,11 +29,11 @@ base_dir = os.path.dirname(__file__)
 def load_events(
     start: datetime = None,
     end: datetime = None,
-    substances: List[str] = [],
-    sources: Optional[
-        List[Union[Literal["standardnotes"], Literal["evernote"], Literal["example"]]]
-    ] = None,
-) -> List[Event]:
+    substances: list[str] = [],
+    sources: None | (
+        list[Literal["standardnotes"] | Literal["evernote"] | Literal["example"]]
+    ) = None,
+) -> list[Event]:
     """
     Load events from various sources.
 
@@ -44,7 +44,7 @@ def load_events(
 
     If set to None, all sources will be attempted.
     """
-    events: List[Event] = []
+    events: list[Event] = []
 
     # NOTE: Many notes are duplicated (due to conflicts),
     # so we will end up with duplcate events that we have to deal with.
@@ -86,7 +86,7 @@ def load_events(
     return events
 
 
-def notes_to_events(notes: List[str]) -> List[Event]:
+def notes_to_events(notes: list[str]) -> list[Event]:
     """
     Turns raw notes into events
 
@@ -118,7 +118,7 @@ def notes_to_events(notes: List[str]) -> List[Event]:
     return events
 
 
-def _get_export_file() -> Optional[Path]:
+def _get_export_file() -> Path | None:
     config = load_config()
     p = config.get("data", {}).get("standardnotes_export", None)
     if p is None:
@@ -126,7 +126,7 @@ def _get_export_file() -> Optional[Path]:
     return Path(p)
 
 
-def _load_standardnotes_export() -> List[str]:
+def _load_standardnotes_export() -> list[str]:
     # NOTE: Used to be deprecated, but not any longer as standardnotes-fs isn't working as well as it used to (after the standardnotes 004 upgrade)
     path = _get_export_file()
     if path is None:
@@ -157,7 +157,7 @@ def _load_standardnotes_export() -> List[str]:
     return notes
 
 
-def _load_dir_notes(path: Path) -> List[str]:
+def _load_dir_notes(path: Path) -> list[str]:
     """
     This used to be called _load_standardnotes_fs,
     as it was used when standardnotes-fs was still functional.
@@ -168,7 +168,7 @@ def _load_dir_notes(path: Path) -> List[str]:
     for p in path.glob("*.md"):
         title = p.name.split(".")[0]
         if re_date.match(title):
-            with open(p, "r") as f:
+            with open(p) as f:
                 text = f.read()
                 # print(title)
                 # print(text)
@@ -183,13 +183,13 @@ def _load_dir_notes(path: Path) -> List[str]:
     return notes
 
 
-def _load_example_notes() -> List[str]:
+def _load_example_notes() -> list[str]:
     notes = _load_dir_notes(Path(base_dir) / ".." / "data" / "test" / "notes")
     assert notes
     return notes
 
 
-def _load_evernotes() -> List[str]:
+def _load_evernotes() -> list[str]:
     notes = []
     # TODO: read from config
     d = Path("./data/private/Evernote")
@@ -232,7 +232,7 @@ def _load_evernotes() -> List[str]:
     return notes
 
 
-def _load_categories() -> Dict[str, List[str]]:
+def _load_categories() -> dict[str, list[str]]:
     "Returns a dict {category: [substances...]}"
     config = load_config()
     categories = config.get("categories", {})
@@ -257,7 +257,7 @@ def _load_substance_aliases() -> dict[str, list[str]]:
     return aliases
 
 
-def _tag_substances(events: List[Event]) -> List[Event]:
+def _tag_substances(events: list[Event]) -> list[Event]:
     substance_categories = _substance2categories()
     for e in events:
         if e.substance and e.substance.lower() in substance_categories:
@@ -272,7 +272,7 @@ def _tag_substances(events: List[Event]) -> List[Event]:
     return events
 
 
-def _extend_substance_abbrs(events) -> List[Event]:
+def _extend_substance_abbrs(events) -> list[Event]:
     substance_aliases = _load_substance_aliases()
     # invert mapping and lowercase for easier lookup
     substance_aliases_inv = {

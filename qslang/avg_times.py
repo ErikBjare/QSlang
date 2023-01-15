@@ -15,7 +15,7 @@ def time_to_radians(time_of_day: time) -> float:
     return radians
 
 
-def average_angle(angles: List[float]) -> float:
+def average_angle(angles: list[float]) -> float:
     # angles measured in radians
     x_sum = numpy.sum([math.sin(x) for x in angles])
     y_sum = numpy.sum([math.cos(x) for x in angles])
@@ -42,7 +42,7 @@ def mean_angle(deg):
     return degrees(phase(sum(rect(1, radians(d)) for d in deg) / len(deg)))
 
 
-def mean_time(times: List[time]) -> time:
+def mean_time(times: list[time]) -> time:
     seconds = (
         (float(t.second) + int(t.minute) * 60 + int(t.hour) * 3600) for t in times
     )
