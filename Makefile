@@ -1,3 +1,5 @@
+SRCFILES=qslang/*.py tests/*.py
+
 run:
 	python3 main.py
 
@@ -15,10 +17,13 @@ data/generated/effectspan-cannabis.csv:
 	poetry run python3 -m qslang effectspan --substances 'weed,hash,cannabis oil' --normalize 'weed' > $@
 
 typecheck:
-	poetry run mypy --ignore-missing-import qslang/*.py tests/*.py
+	poetry run mypy --ignore-missing-import ${SRCFILES}
 
 format:
 	poetry run black qslang tests
+
+pyupgrade:
+	poetry run pyupgrade --py310-plus ${SRCFILES}
 
 data/private/Evernote:
 	cd thirdparty/evernote-dump/source/ && \

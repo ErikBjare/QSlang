@@ -12,7 +12,7 @@ packages = [
 qslang = "qslang.main:main"
 
 [tool.poetry.dependencies]
-python = "^3.9"
+python = "^3.10"
 aw-core = "*"
 
 numpy = "*"
