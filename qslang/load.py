@@ -191,6 +191,7 @@ def _load_example_notes() -> List[str]:
 
 def _load_evernotes() -> List[str]:
     notes = []
+    # TODO: read from config
     d = Path("./data/private/Evernote")
     dateset = set()
     for p in d.glob("*.md"):
@@ -249,34 +250,37 @@ def _substance2categories():
     return sub2cat
 
 
-substance_categories = _substance2categories()
-
-
-def _load_substance_aliases():
+def _load_substance_aliases() -> dict[str, list[str]]:
+    """Loads a mapping from target values to a list of substance aliases that should be renamed to target"""
     config = load_config()
-    return config.get("aliases", {})
-
-
-substance_aliases = _load_substance_aliases()
+    aliases = config.get("aliases", {})
+    return aliases
 
 
 def _tag_substances(events: List[Event]) -> List[Event]:
+    substance_categories = _substance2categories()
     for e in events:
         if e.substance and e.substance.lower() in substance_categories:
             cats = substance_categories[e.substance.lower()]
             e.data["tags"] = cats
+    n_doses = len([e for e in events if e.substance])
     n_categorized = len([e for e in events if e.tags])
-    frac_categorized = n_categorized / len(events) if events else 0.0
+    frac_categorized = n_categorized / n_doses if events else 0.0
     logger.info(
-        f"Categorized {n_categorized} out of {len(events)} events ({round(frac_categorized*100, 1)}%)"
+        f"Categorized {n_categorized} out of {n_doses} doses ({round(frac_categorized*100, 1)}%)"
     )
     return events
 
 
 def _extend_substance_abbrs(events) -> List[Event]:
+    substance_aliases = _load_substance_aliases()
+    # invert mapping and lowercase for easier lookup
+    substance_aliases_inv = {
+        v.lower(): k for k, vs in substance_aliases.items() for v in vs
+    }
     for e in events:
-        if e.substance and e.substance.lower() in substance_aliases:
-            e.data["substance"] = substance_aliases[e.substance.lower()]
+        if e.substance and e.substance.lower() in substance_aliases_inv:
+            e.data["substance"] = substance_aliases_inv[e.substance.lower()]
     return events
 
 

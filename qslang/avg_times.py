@@ -33,14 +33,6 @@ def radians_to_time_of_day(x: float) -> time:
     return time(hour, minute, second)
 
 
-def average_times_of_day(x: List[Union[datetime, time]]) -> time:
-    # input datetime array and output time value
-    # FIXME: This is broken, look at `mean_time` instead
-    angles = [time_to_radians(y.time() if isinstance(y, datetime) else y) for y in x]
-    avg_angle = average_angle(angles)
-    return radians_to_time_of_day(avg_angle)
-
-
 # Based on: https://rosettacode.org/wiki/Averages/Mean_time_of_day#Python
 from cmath import rect, phase
 from math import radians, degrees
@@ -62,21 +54,17 @@ def mean_time(times: List[time]) -> time:
         mean_seconds += day
     h, m = divmod(mean_seconds, 3600)
     m, s = divmod(m, 60)
+    if h == 24:
+        h = 0
     return time(int(h), int(m), int(s))
 
 
-t = average_times_of_day([datetime(2017, 6, 9, 0, 10), datetime(2017, 6, 9, 0, 20)])
-assert t == time(0, 15)
+def test_mean_time():
+    t = mean_time([datetime(2017, 6, 9, 0, 10), datetime(2017, 6, 9, 0, 20)])
+    assert time(0, 14, 59) <= t <= time(0, 15)
 
-t = average_times_of_day([datetime(2017, 6, 9, 23, 50), datetime(2017, 6, 9, 0, 10)])
-assert t == time(0, 0)
+    t = mean_time([datetime(2017, 6, 9, 23, 50), datetime(2017, 6, 9, 0, 10)])
+    assert t == time(0, 0)
 
-t = average_times_of_day(
-    [time(23, 0, 17), time(23, 40, 20), time(0, 12, 45), time(0, 17, 19)]
-)
-# FIXME: Rosetta example thinks it should be '23:47:43'?
-assert t == time(23, 47, 53)
-
-
-t = mean_time([time(23, 0, 17), time(23, 40, 20), time(0, 12, 45), time(0, 17, 19)])
-assert t == time(23, 47, 43)
+    t = mean_time([time(23, 0, 17), time(23, 40, 20), time(0, 12, 45), time(0, 17, 19)])
+    assert t == time(23, 47, 43)

@@ -1,9 +1,12 @@
 [categories]
-stimulants = ["Caffeine", "Modafinil"]
+stimulants = ["Coffee", "Caffeine", "Modafinil"]
 sleepaids = ["Melatonin", "5-HTP", "Magnesium", "L-Theanine"]  # Gentle sleep aids
+alcohol = ["Beer", "Wine"]
+supplements = ["Creatine monohydrate", "Fish Oil", "Magnesium bisglycinate", "Zinc"]
 
 [aliases]
 "Creatine monohydrate" = ["Creatine"]
 
 [data]
-standardnotes = "/home/user/Backup/Standard Notes/"
+standardnotes = "data/test/notes"   # folder-based using snfs
+#standardnotes_export = ""          # unencrypted standardnotes export txt (actually JSON) file

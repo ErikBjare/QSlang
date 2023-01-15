@@ -8,22 +8,44 @@ QSlang
 
 A text-based language for manual entry of quantified self data.
 
-Useful for logging in a flexible textual format which allows for interleaving of partially structured data to later be structured. Input on touch devices is surprisingly efficient in combination with sentence-predicting keyboards.
+Useful for logging in a flexible textual format which allows for interleaving of partially structured data to later be structured. Input on phones/touch devices is surprisingly efficient when used with sentence-predicting keyboards (like Swiftkey etc).
+
+Built with parsimonious (to parse notes) and pint (to handle units).
 
 Pronounced: Q-Slang
 
 Usage
 =====
 
-This repo contains tools to import from:
+```
+$ qslang --help
+Usage: qslang [OPTIONS] COMMAND [ARGS]...
+
+Options:
+  -v, --verbose
+  --help         Show this message and exit.
+
+Commands:
+  doses            print summary of doses for each substance
+  effectspan       print effect spans
+  events           print list of all doses
+  plot             plot doses over time in a barchart
+  plot-calendar    plot doses in a calendar
+  plot-effectspan  plot effect spans in a barchart
+  substances       print list of substances
+```
+
+For setup & configuration, copy `config.toml.example` to `config.toml` and edit as appropriate.
+
+This repo can read data from:
 
  - Directory with plaintext-files (as created by [standardnotes-fs](https://github.com/tannercollin/standardnotes-fs))
- - Evernote
- - Standard Notes export (deprecated)
+ - Standard Notes export (unencrypted)
+ - Evernote (enex files)
 
-For directory/standardnotes: Put your notes in `~/notes` or use standardnotes-fs to mount to the same directory.
+For Standard Notes exports: create an unencrypted export and unzip the `SN Archive.txt` file (keep its default name).  Set the `data.standardnotes` key to the folder path in config.
 
-For Standard Notes exports: create an unencrypted export and unzip the `SN Archive.txt` file into `./data/private` (keep its default name). 
+For directory/standardnotes-fs: Put your notes in a folder, or use standardnotes-fs (deprecated) to mount your notes the same directory. Set the `data.standardnotes_export` key to the file path in config.
 
 For Evernote, export the notebooks you want to analyze as `.enex` file. Then put all the exported notebooks you want into `./data/private`. Then run `make data/private/Evernote` to extract the .enex into markdown files (which will be put into `data/private/Evernote/`).
 

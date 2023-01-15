@@ -18,7 +18,8 @@ from . import Event, Dose, load_events, print_events
 from .util import monthrange, dayrange
 from .igroupby import igroupby
 from .pharmacokinetics import effectspan as _effectspan
-from .avg_times import average_times_of_day, mean_time
+from .avg_times import mean_time
+from .config import set_global_testing, load_config
 
 logger = logging.getLogger(__name__)
 
@@ -28,8 +29,15 @@ start_of_day = timedelta(hours=4)
 
 @click.group()
 @click.option("-v", "--verbose", is_flag=True)
-def main(verbose=False):
-    logging.basicConfig(level=logging.DEBUG if verbose else logging.INFO)
+@click.option("--testing", is_flag=True, help="run with testing config & data")
+def main(verbose=False, testing=True):
+    logging.basicConfig(
+        level=logging.DEBUG if verbose else logging.INFO,
+        format="%(levelname).4s | %(module)-8s |  %(message)s",
+    )
+
+    set_global_testing()
+    load_config()
 
 
 @main.command(help="print list of all doses")
