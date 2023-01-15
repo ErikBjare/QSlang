@@ -25,6 +25,9 @@ format:
 pyupgrade:
 	poetry run pyupgrade --py310-plus ${SRCFILES}
 
+no_implicit_optional:
+	poetry run no_implicit_optional --use-union-or .
+
 precommit:
 	make format
 	make pyupgrade
