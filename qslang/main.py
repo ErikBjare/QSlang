@@ -31,6 +31,7 @@ start_of_day = timedelta(hours=4)
 @click.option("-v", "--verbose", is_flag=True)
 @click.option("--testing", is_flag=True, help="run with testing config & data")
 def main(verbose=False, testing=True):
+    """QSlang is a tool to parse and analyze dose logs, for science."""
     logging.basicConfig(
         level=logging.DEBUG if verbose else logging.INFO,
         format="%(levelname).4s | %(module)-8s |  %(message)s",
@@ -208,6 +209,68 @@ def plot_effectspan(start, end, substances):
         # invert axis such that each day starts at the top
         ax.set_ylim(0, 24)
         ax.invert_yaxis()
+        plt.title("Effectspans where subject is under influence of substance")
+        plt.legend()
+        plt.show()
+
+
+@main.command(help="plot percent of time spent under effects of a substance")
+@click.option(
+    "--start", type=click.DateTime(["%Y-%m-%d"]), help="start date to filter events by"
+)
+@click.option(
+    "--end", type=click.DateTime(["%Y-%m-%d"]), help="end date to filter events by"
+)
+@click.option("--substances", help="substances to filter by (comma-separated)")
+def plot_influence(start, end, substances):
+    substances_list = substances.split(",") if substances else []
+    events = load_events(start, end, substances_list)
+    events = [e for e in events if e.substance]
+
+    if events:
+        effectspans = _effectspan(
+            [
+                (e.timestamp.replace(tzinfo=timezone.utc), e.dose)
+                for e in events
+                if e.dose
+            ]
+        )
+
+        # count the number of hours spent under the influence of each substance, by day
+        # we will build a dict of {substance: {date: hours}}
+        # TODO: Handle spans that cross the day boundary
+        hours_by_substance_by_day = defaultdict(lambda: defaultdict(float))
+        for span in effectspans:
+            substance = span.data["substance"]
+            day = (span.timestamp - day_offset).date()
+            hours_by_substance_by_day[substance][day] += (
+                span.duration.total_seconds() / 3600
+            )
+
+        # plot
+        fig, ax = plt.subplots()
+        ax.set_xlabel("Date")
+        ax.set_ylabel("Hours")
+
+        import pandas as pd
+
+        # plot bars
+        for subst, hours_by_day in hours_by_substance_by_day.items():
+            x = list(hours_by_day.keys())
+            y = list(hours_by_day.values())
+            ax.bar(x, y, label=subst)
+
+            # plot a line for the moving average, with pandas
+            df = pd.DataFrame({"days": x, "hours": y})
+            df = df.set_index("days")
+            df = df.reindex(
+                pd.date_range(start=df.index.min(), end=df.index.max()), fill_value=0
+            )
+            df["rolling"] = df["hours"].rolling(7).mean()
+            ax.plot(df.index, df["rolling"], label=f"{subst} 7D MA")
+
+        ax.set_ylim(0, 24)
+        plt.title("Hours spent under the influence of substance")
         plt.legend()
         plt.show()
 

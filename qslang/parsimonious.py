@@ -63,7 +63,7 @@ grammar = parsimonious.Grammar(
     amount      = (unknown ws unit?) / (approx? fraction ws unit?) / (approx? number ws unit?)
     number      = ~"[0-9]+[.]?[0-9]*"
     unit        = prefixlessunit / (siprefix? baseunit)
-    prefixlessunit = "cup" / "x" / "IU" / "GDU" / "B" / "serving"
+    prefixlessunit = "cup" / "x" / "IU" / "GDU" / "B" / "serving" / ~"puff(s)?"
     siprefix    = "n" / "u" / "mc" / "m" / "c" / "d"
     baseunit    = "g" / "l"
     substance   = ~"[a-z0-9\-äåö]+"i (ws !roa ~"[a-z0-9\-åäö]+"i)*
@@ -677,7 +677,7 @@ def _parse_continue_on_err(s: str) -> list[Event | ParseError]:
                 entries.extend(events)
         except Exception as e:
             # Useful in testing to get stacktraces
-            #logger.exception(e)
+            # logger.exception(e)
             entries.append(ParseError(e, line, day_header[2:]))
 
     return entries
