@@ -21,8 +21,11 @@ Usage
 $ qslang --help
 Usage: qslang [OPTIONS] COMMAND [ARGS]...
 
+  QSlang is a tool to parse and analyze dose logs, for science.
+
 Options:
   -v, --verbose
+  --testing      run with testing config & data
   --help         Show this message and exit.
 
 Commands:
@@ -32,6 +35,7 @@ Commands:
   plot             plot doses over time in a barchart
   plot-calendar    plot doses in a calendar
   plot-effectspan  plot effect spans in a barchart
+  plot-influence   plot percent of time spent under effects of a substance
   substances       print list of substances
 ```
 

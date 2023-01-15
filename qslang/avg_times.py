@@ -1,7 +1,6 @@
 # From: https://stackoverflow.com/a/44463260/965332
 
-from datetime import datetime, time, timedelta
-from typing import List, Union
+from datetime import datetime, time
 import math
 import numpy
 

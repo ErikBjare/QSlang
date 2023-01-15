@@ -4,7 +4,7 @@ import os
 import re
 import logging
 import json
-from typing import List, Dict, Optional, Union, Literal
+from typing import Literal
 from pathlib import Path
 from collections import defaultdict
 from datetime import datetime
@@ -30,7 +30,8 @@ def load_events(
     start: datetime = None,
     end: datetime = None,
     substances: list[str] = [],
-    sources: None | (
+    sources: None
+    | (
         list[Literal["standardnotes"] | Literal["evernote"] | Literal["example"]]
     ) = None,
 ) -> list[Event]:

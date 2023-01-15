@@ -10,27 +10,29 @@ set -x
 # set environment variable to disable plotting
 export MPLBACKEND=Agg
 
+FLAGS="--testing"
+
 # print help
-qslang --help
+qslang $FLAGS --help
 
 # list all substances
-qslang substances
+qslang $FLAGS substances
 
-# list doses
-qslang doses --substances caffeine
+# print summary
+qslang $FLAGS summary --substances caffeine
 
 # list events
-qslang events --substances caffeine
+qslang $FLAGS events --substances caffeine
 
 # list effectspans of common substance
-qslang effectspan --substances caffeine
+qslang $FLAGS effectspan --substances caffeine
 
 # plots
-qslang plot --substances caffeine
-qslang plot-calendar --substances caffeine
-qslang plot-effectspan --substances caffeine
+qslang $FLAGS plot --substances caffeine
+qslang $FLAGS plot-calendar --substances caffeine
+qslang $FLAGS plot-effectspan --substances caffeine
 
 # old tests
-qslang plot --substances caffeine
-qslang plot --count --substances caffeine
-qslang plot --days --substances caffeine
+qslang $FLAGS plot --substances caffeine
+qslang $FLAGS plot --count --substances caffeine
+qslang $FLAGS plot --days --substances caffeine

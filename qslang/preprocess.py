@@ -1,5 +1,3 @@
-from typing import List
-
 from qslang.event import Event
 
 _alcohol_conc_assumptions = {

@@ -7,7 +7,7 @@ We will comment step by step how the parser works.
 
 import logging
 import pytest
-from typing import List, Dict, Any, Union, Tuple
+from typing import Any
 from collections.abc import Generator
 from datetime import time, date, datetime, timedelta
 

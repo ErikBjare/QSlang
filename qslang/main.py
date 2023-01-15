@@ -3,7 +3,6 @@
 import logging
 import statistics
 import json
-from typing import List, Dict, Tuple, Optional
 from collections import Counter, defaultdict
 from datetime import date, datetime, timedelta, timezone
 from itertools import groupby
@@ -64,7 +63,7 @@ def events(start: datetime, end: datetime, substances: str | None):
     "--end", type=click.DateTime(["%Y-%m-%d"]), help="end date to filter events by"
 )
 @click.option("--substances", help="substances to filter by (comma-separated)")
-def doses(start: datetime, end: datetime, substances: str) -> None:
+def summary(start: datetime, end: datetime, substances: str) -> None:
     # TODO: rename function to something more descriptive, like 'summary'?
     substances_list = substances.split(",") if substances else []
     events = load_events(start, end, substances_list)
@@ -450,13 +449,13 @@ def _print_daily_doses(
         print(f"   - {roa.ljust(10)}  n: {len(grouped_by_roa[roa])}")
 
 
-TDate = tuple[int, int, Optional[int]]
+TDate = tuple[int, int, int | None]
 
 day_offset = timedelta(hours=-4)
 
 
 def _grouped_by_date(events: list[Event], monthly=True) -> dict[TDate, list[Event]]:
-    grouped_by_date: dict[tuple[int, int, int | None], list[Event]] = defaultdict(list)
+    grouped_by_date: dict[TDate, list[Event]] = defaultdict(list)
     for period, events_grouped in groupby(
         events,
         key=lambda e: (

@@ -3,7 +3,7 @@
 import logging
 import pint
 from pint.definitions import UnitDefinition, ScaleConverter
-from typing import Union, Any
+from typing import Any
 
 
 log = logging.getLogger(__name__)
