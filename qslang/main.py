@@ -36,7 +36,8 @@ def main(verbose=False, testing=True):
         format="%(levelname).4s | %(module)-8s |  %(message)s",
     )
 
-    set_global_testing()
+    if testing:
+        set_global_testing()
     load_config()
 
 
@@ -392,9 +393,7 @@ day_offset = timedelta(hours=-4)
 
 
 def _grouped_by_date(events: list[Event], monthly=True) -> dict[TDate, list[Event]]:
-    grouped_by_date: dict[tuple[int, int, int | None], list[Event]] = defaultdict(
-        list
-    )
+    grouped_by_date: dict[tuple[int, int, int | None], list[Event]] = defaultdict(list)
     for period, events_grouped in groupby(
         events,
         key=lambda e: (
