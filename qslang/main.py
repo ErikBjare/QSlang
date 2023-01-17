@@ -4,7 +4,7 @@ import logging
 import statistics
 import json
 from collections import Counter, defaultdict
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, time, datetime, timedelta, timezone
 from itertools import groupby
 
 import matplotlib.pyplot as plt
@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 import click
 import pint
+import calplot
 
 from . import Event, Dose, load_events, print_events
 from .util import monthrange, dayrange
@@ -165,7 +166,6 @@ def plot_effectspan(start, end, substances):
 
             # split bars crossing the 24h mark
             for bar in bars:
-                from datetime import time
 
                 bar_end_hour = bar[1].hour + bar[2].total_seconds() / 3600
                 if bar_end_hour > 24:
@@ -250,8 +250,6 @@ def plot_influence(start, end, substances):
         fig, ax = plt.subplots()
         ax.set_xlabel("Date")
         ax.set_ylabel("Hours")
-
-        import pandas as pd
 
         # plot bars
         for subst, hours_by_day in hours_by_substance_by_day.items():
@@ -368,7 +366,7 @@ def _print_daily_doses(
         sorted(events), key=lambda e: (e.timestamp - start_of_day).date()
     )
     assert events[0].dose
-    # init outer (all days) accumulator
+    # outer accumulator (all days)
     tot_amt = Dose(substance, events[0].dose.quantity * 0)
     for _, v in grouped_by_date.items():
         valid_doses = [
@@ -384,17 +382,19 @@ def _print_daily_doses(
             continue
 
         # find first non-zero non-dimensionless dose to use as accumulator
+        # FIXME: accumulate by unit type (g, l, x, puffs, etc)
         initdose = valid_doses[0]
 
         try:
-            # init inner (per day) accumulator
+            # inner accumulator (per day)
             amt = Dose(substance, initdose.quantity * 0)
             for e in v:
                 if e.dose and e.dose.quantity.magnitude > 0:
                     amt += e.dose
+            # add to outer accumulator
             tot_amt += amt
         except Exception as e:
-            logger.warning(f"Unable to sum amounts '{v}', '{tot_amt}': {e}")
+            logger.exception(f"Unable to sum amounts '{v}', '{tot_amt}': {e}")
             # logger.warning(f"initdose: {initdose}")
             # logger.warning(f"dose to add: {e}")
 
@@ -602,9 +602,15 @@ def _plot_frequency(
     plt.show()
 
 
-def _plot_calendar(events, cmap="Reds", fillcolor="whitesmoke", figsize=None, **kwargs):
+def _plot_calendar(
+    events,
+    cmap="YlGn",
+    fillcolor="whitesmoke",
+    figsize=None,
+    one_per_day=True,
+    **kwargs,
+):
     # suitable values for cmap: Reds, YlGn
-    import calplot
 
     # Filter away journal entries and sort
     events = list(sorted(filter(lambda e: e.type == "dose", events)))
@@ -613,7 +619,8 @@ def _plot_calendar(events, cmap="Reds", fillcolor="whitesmoke", figsize=None, **
     for e in events:
         e.data["substance"] = "Any"
 
-    period_counts = _count_doses(events, one_per_day=True, monthly=False)
+    # TODO: use dose or dose equivalents instead of count
+    period_counts = _count_doses(events, one_per_day=False, monthly=False)
     assert len(period_counts) == 1
 
     doses = [n_dose for n_dose in next(iter(period_counts.values())).values()]
@@ -634,7 +641,7 @@ def _plot_calendar(events, cmap="Reds", fillcolor="whitesmoke", figsize=None, **
         linewidth=1,
         figsize=figsize,
         vmin=0,
-        vmax=1,
+        vmax=1 if one_per_day else max(series),
         dropzero=False,
         fig_kws=kwargs,
     )

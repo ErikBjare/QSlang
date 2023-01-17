@@ -38,7 +38,7 @@ def load_config(testing=False):
             logger.warning("No config found, falling back to example config")
         if testing:
             logger.info("Using example config for testing")
-        filepath = rootdir / "config.toml.example"
+        filepath = rootdir / "config.example.toml"
 
     logger.info(f"Using config file at {filepath}")
     with open(filepath) as f:

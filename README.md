@@ -51,7 +51,7 @@ Commands:
   summary          print summary of doses for each substance
 ```
 
-For setup & configuration, copy `config.toml.example` to `config.toml` and edit as appropriate.
+For setup & configuration, copy `config.example.toml` to `config.toml` and edit as appropriate.
 
 QSlang can read data from:
 

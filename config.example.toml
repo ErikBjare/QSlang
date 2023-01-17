@@ -1,12 +1,17 @@
+# Categories are used to group similar substances together
 [categories]
 stimulants = ["Coffee", "Caffeine", "Modafinil"]
 sleepaids = ["Melatonin", "5-HTP", "Magnesium", "L-Theanine"]  # Gentle sleep aids
-alcohol = ["Beer", "Wine"]
+alcohol = ["Beer", "Wine", "Drink", "Vodka", "Gin", "Whiskey", "Cider"]
 supplements = ["Creatine monohydrate", "Fish Oil", "Magnesium bisglycinate", "Zinc"]
 
+# Aliases can be used to substitute synonyms,
+# like shorthands/mispellings into their proper name,
+# or similar things as the same thing.
 [aliases]
 "Creatine monohydrate" = ["Creatine"]
 
+# This is where you specify the location of logs to load
 [data]
 standardnotes = "data/test/notes"   # folder-based using snfs
 #standardnotes_export = ""          # unencrypted standardnotes export txt (actually JSON) file
