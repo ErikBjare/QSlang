@@ -16,7 +16,6 @@ from parsimonious.nodes import Node, NodeVisitor
 
 from .event import Event
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -101,8 +100,6 @@ def parse_defer_errors(s: str) -> tuple[list[Event], list[ParseError]]:
     errors = []
     for e in entries:
         if isinstance(e, Event):
-            if e.timestamp.date() < date(1901, 1, 1):
-                logger.warning("No date for events")
             events.append(e)
         elif isinstance(e, ParseError):
             # logger.warning(f"Error while parsing: {e}")
@@ -111,7 +108,7 @@ def parse_defer_errors(s: str) -> tuple[list[Event], list[ParseError]]:
             print(e)
             raise TypeError(f"Unexpected type: {type(e)}")
     # check how many have 1900-1-1 as date
-    n_no_date = len([e for e in events if e.timestamp.date() <= date(1994, 1, 1)])
+    n_no_date = len([e for e in events if e.timestamp.date() <= date(1901, 1, 1)])
     if n_no_date:
         logger.warning(f"{n_no_date} events have no date")
     return events, errors

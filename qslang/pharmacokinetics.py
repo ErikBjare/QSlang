@@ -9,7 +9,6 @@ import matplotlib.pyplot as plt
 from aw_core import Event
 from . import Dose
 
-
 logger = logging.getLogger(__name__)
 
 
