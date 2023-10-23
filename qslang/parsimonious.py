@@ -6,10 +6,16 @@ We will comment step by step how the parser works.
 """
 
 import logging
-import pytest
-from typing import Any
 from collections.abc import Generator
-from datetime import time, date, datetime, timedelta
+from datetime import (
+    date,
+    datetime,
+    time,
+    timedelta,
+)
+from typing import Any
+
+import pytest
 
 import parsimonious
 from parsimonious.nodes import Node, NodeVisitor
@@ -44,7 +50,7 @@ grammar = parsimonious.Grammar(
     r"""
     entries     = day_header? ws (entry)*
 
-    day_header  = '#' ws date (ws "-" ws ~"[a-z ]+"i)? nl?
+    day_header  = '#' ws date (ws "-" ws ~"[a-z0-9 ]+"i)? nl?
     entry       = ws time_prefix* time ws "-" ws entry_data ws nl?
     entry_data  = dose_list / note
     note        = ~"[A-Z][^\n]+"i

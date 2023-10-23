@@ -1,20 +1,20 @@
 #!/bin/env python3
 
+import itertools
+import json
+import logging
 import os
 import re
-import logging
-import json
-from typing import Literal
-from pathlib import Path
 from collections import defaultdict
 from datetime import datetime
+from pathlib import Path
+from typing import Literal
 
-from .event import Event
-from .parsimonious import parse_defer_errors
 from .config import load_config
+from .event import Event
 from .filter import filter_events
+from .parsimonious import parse_defer_errors
 from .preprocess import _alcohol_preprocess
-
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +52,7 @@ def load_events(
 
     if sources is None or "standardnotes" in sources:
         logger.info("Loading standardnotes...")
-        new_events = notes_to_events(_load_standardnotes_export())
+        new_events = notes_to_events(_load_standardnotes())
         logger.info(f"Loaded {len(new_events)} from standardnotes")
         events += new_events
 
@@ -106,9 +106,9 @@ def notes_to_events(notes: list[str]) -> list[Event]:
         logger.warning(
             f"Found {len(errors)} ({len(errors) / total * 100:.2f}%) errors when parsing {total} notes"
         )
-        # logger.warning("First 3 errors")
-        # for e in errors[:3]:
-        #     logger.exception(e)
+        logger.warning("First 3 errors")
+        for e in errors[:3]:
+            logger.exception(e)
 
     # remove duplicate events
     events_pre = len(events)
@@ -119,6 +119,14 @@ def notes_to_events(notes: list[str]) -> list[Event]:
     return events
 
 
+def _get_notes_dir() -> Path | None:
+    config = load_config()
+    p = config.get("data", {}).get("standardnotes", None)
+    if p is None:
+        return None
+    return Path(p)
+
+
 def _get_export_file() -> Path | None:
     config = load_config()
     p = config.get("data", {}).get("standardnotes_export", None)
@@ -127,7 +135,26 @@ def _get_export_file() -> Path | None:
     return Path(p)
 
 
+def _load_standardnotes() -> list[str]:
+    # use dir-loader or file-loader depending on config
+    path_dir = _get_notes_dir()
+    path_export = _get_export_file()
+    assert path_dir
+    if path_dir and path_export:
+        raise ValueError(
+            "Both `data.standardnotes` and `data.standardnotes_export` are configured, comment out one of them in config"
+        )
+    if path_dir and path_dir.exists():
+        return _load_dir_notes(path_dir)
+    elif path_export and path_export.exists():
+        return _load_standardnotes_export()
+    else:
+        logger.warning("no standardnotes export in config")
+        return []
+
+
 def _load_standardnotes_export() -> list[str]:
+    """Loads a "Standard Notes Backup and Import File.txt" (JSON) file"""
     # NOTE: Used to be deprecated, but not any longer as standardnotes-fs isn't working as well as it used to (after the standardnotes 004 upgrade)
     path = _get_export_file()
     if path is None:
@@ -166,7 +193,7 @@ def _load_dir_notes(path: Path) -> list[str]:
     However, it was repurposed as it generalizes well.
     """
     notes = []
-    for p in path.glob("*.md"):
+    for p in itertools.chain(path.glob("*.md"), path.glob("*.txt")):
         title = p.name.split(".")[0]
         if re_date.match(title):
             with open(p) as f:
