@@ -1,7 +1,10 @@
 # From: https://stackoverflow.com/a/44463260/965332
 
-from datetime import datetime, time
 import math
+from cmath import phase, rect
+from datetime import datetime, time
+from math import degrees, radians
+
 import numpy
 
 
@@ -33,15 +36,13 @@ def radians_to_time_of_day(x: float) -> time:
 
 
 # Based on: https://rosettacode.org/wiki/Averages/Mean_time_of_day#Python
-from cmath import rect, phase
-from math import radians, degrees
 
 
 def mean_angle(deg):
     return degrees(phase(sum(rect(1, radians(d)) for d in deg) / len(deg)))
 
 
-def mean_time(times: list[time]) -> time:
+def mean_time(times: list[time | datetime]) -> time:
     seconds = (
         (float(t.second) + int(t.minute) * 60 + int(t.hour) * 3600) for t in times
     )

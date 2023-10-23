@@ -17,7 +17,7 @@ data/generated/effectspan-cannabis.csv:
 	poetry run python3 -m qslang effectspan --substances 'weed,hash,cannabis oil' --normalize 'weed' > $@
 
 typecheck:
-	poetry run mypy --ignore-missing-import ${SRCFILES}
+	poetry run mypy --ignore-missing-import --check-untyped-defs ${SRCFILES}
 
 format:
 	poetry run black qslang tests

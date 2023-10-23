@@ -1,25 +1,36 @@
 #!/bin/env python3
 
+import json
 import logging
 import statistics
-import json
 from collections import Counter, defaultdict
-from datetime import date, time, datetime, timedelta, timezone
+from datetime import (
+    date,
+    datetime,
+    time,
+    timedelta,
+    timezone,
+)
 from itertools import groupby
 
+import calplot
+import click
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import click
 import pint
-import calplot
 
-from . import Event, Dose, load_events, print_events
-from .util import monthrange, dayrange
+from . import (
+    Dose,
+    Event,
+    load_events,
+    print_events,
+)
+from .avg_times import mean_time
+from .config import load_config, set_global_testing
 from .igroupby import igroupby
 from .pharmacokinetics import effectspan as _effectspan
-from .avg_times import mean_time
-from .config import set_global_testing, load_config
+from .util import dayrange, monthrange
 
 logger = logging.getLogger(__name__)
 
@@ -166,7 +177,6 @@ def plot_effectspan(start, end, substances):
 
             # split bars crossing the 24h mark
             for bar in bars:
-
                 bar_end_hour = bar[1].hour + bar[2].total_seconds() / 3600
                 if bar_end_hour > 24:
                     # create a new bar for the time past midnight
@@ -196,8 +206,8 @@ def plot_effectspan(start, end, substances):
         ax.set_xlabel("Date")
         ax.set_ylabel("Hour")
 
-        for subst, bars in bars_by_substance.items():
-            x, height, bottom = zip(*bars)
+        for subst, subst_bars in bars_by_substance.items():
+            x, height, bottom = zip(*subst_bars)
             ax.bar(
                 x,
                 height,
@@ -238,7 +248,9 @@ def plot_influence(start, end, substances):
         # count the number of hours spent under the influence of each substance, by day
         # we will build a dict of {substance: {date: hours}}
         # TODO: Handle spans that cross the day boundary
-        hours_by_substance_by_day = defaultdict(lambda: defaultdict(float))
+        hours_by_substance_by_day: dict[str, dict[date, float]] = defaultdict(
+            lambda: defaultdict(float)
+        )
         for span in effectspans:
             substance = span.data["substance"]
             day = (span.timestamp - day_offset).date()
@@ -584,7 +596,8 @@ def _plot_frequency(
         labels = dayrange(min(labels), max(labels))
     else:
         labels = [(m[0], m[1], 1) for m in monthrange(min(labels)[:2], max(labels)[:2])]
-    labels_date = [datetime(*t) for t in labels]
+    fmt = "%Y-%m-%d" if daily else "%Y-%m"
+    labels_date = [datetime(*t).strftime(fmt) for t in labels]
 
     stackheight = np.zeros(len(labels))
     for substance, value_by_date in period_counts.items():
