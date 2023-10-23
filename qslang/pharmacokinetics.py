@@ -1,13 +1,14 @@
-from datetime import datetime, timedelta, timezone
-from collections import defaultdict
 import logging
+from collections import defaultdict
+from datetime import datetime, timedelta, timezone
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-
 from aw_core import Event
+
 from . import Dose
+from .config import load_config
 
 logger = logging.getLogger(__name__)
 
@@ -48,32 +49,15 @@ def compute_plasma(doses: list[tuple[datetime, Dose]]):
     print(df)
 
 
-# Durations for different substances
-# TODO: Read from file instead of hardcode (crawl psychonautwiki?)
-# TODO: Combine substance with several names (weed/cannabis/hash, beer/wine/whiskey, etc.)
-subst_durations = {
-    # NOTE: these are synonyms, and should be converted
-    "caffeine": timedelta(hours=5),
-    "coffee": timedelta(hours=5),
-    #
-    # NOTE: these are synonyms, and should be converted
-    "cannabis": timedelta(hours=3),
-    "weed": timedelta(hours=3),
-    "hash": timedelta(hours=3),
-    #
-    # NOTE: Alcohol clearance is badly modeled by a halflife or fixed duration, as clearance is ~constant.
-    #       From a search: "Alcohol leaves the body at an average rate of 0.015 g/100mL/hour"
-    # NOTE: This also has synonyms (Drink, Beer, Wine, Whiskey, etc.)
-    "alcohol": timedelta(hours=4),
-}
-
-
 def effectspan_substance(doses: list[tuple[datetime, Dose]]) -> list[Event]:
     """
     Given a list of doses for a particular substance, return a list of events
     spanning the time during which the substance was active (according to durations specified in a dictionary).
     """
     subst = doses[0][1].substance.lower()
+    subst_durations = {
+        k: timedelta(hours=v) for k, v in load_config().get("durations", {}).items()
+    }
 
     # TODO: Incorporate time-until-effect into the calculation
     # assert all doses of same substance

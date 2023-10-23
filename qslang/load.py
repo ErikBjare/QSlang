@@ -84,6 +84,16 @@ def load_events(
                     f"Substance '{e.substance}' contained illegal char '{char}' (entry time: {e.timestamp})"
                 )
 
+    # remove events before 1970 since they are clearly wrong
+    idxs = []
+    for i, e in enumerate(events):
+        if e.timestamp.year < 1970:
+            idxs.append(i)
+    if idxs:
+        logger.warning(f"Removing {len(idxs)} events before 1970: {events[idxs[0]]}...")
+    for i in reversed(idxs):
+        del events[i]
+
     return events
 
 

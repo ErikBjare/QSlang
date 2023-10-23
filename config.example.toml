@@ -1,4 +1,4 @@
-# Categories are used to group similar substances together
+# Categories are used to group similar substances together.
 [categories]
 stimulants = ["Coffee", "Caffeine", "Modafinil"]
 sleepaids = ["Melatonin", "5-HTP", "Magnesium", "L-Theanine"]  # Gentle sleep aids
@@ -11,7 +11,13 @@ supplements = ["Creatine monohydrate", "Fish Oil", "Magnesium bisglycinate", "Zi
 [aliases]
 "Creatine monohydrate" = ["Creatine"]
 
-# This is where you specify the location of logs to load
+# Durations are the used to get an approximate duration of the effects of a substance.
+# Here in hours.
+[durations]
+"caffeine" = 4
+"modafinil" = 12
+
+# This is where you specify the location of logs to load.
 [data]
-standardnotes = "data/test/notes"   # folder-based using snfs
+standardnotes = "data/test/notes"   # folder-based using snfs or standardnotes plaintext backup folder
 #standardnotes_export = ""          # unencrypted standardnotes export txt (actually JSON) file
