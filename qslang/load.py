@@ -134,7 +134,7 @@ def _get_notes_dir() -> Path | None:
     p = config.get("data", {}).get("standardnotes", None)
     if p is None:
         return None
-    return Path(p)
+    return Path(p).expanduser()
 
 
 def _get_export_file() -> Path | None:
@@ -142,7 +142,7 @@ def _get_export_file() -> Path | None:
     p = config.get("data", {}).get("standardnotes_export", None)
     if p is None:
         return None
-    return Path(p)
+    return Path(p).expanduser()
 
 
 def _load_standardnotes() -> list[str]:
