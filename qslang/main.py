@@ -451,7 +451,7 @@ def _print_daily_doses(
         print(
             f" - min/median/max dose: {min_dose.amount_with_unit}/{median_dose.amount_with_unit}/{max_dose.amount_with_unit}"
         )
-    except pint.errors.DimensionalityError:
+    except (pint.errors.DimensionalityError, AssertionError):
         logger.warning(
             "Couldn't compute min/median/max doses due to inconsistent units"
         )

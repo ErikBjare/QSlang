@@ -30,6 +30,8 @@ ureg.define("unknown = x")  # for now
 ureg.define("serving = x")  # for now
 ureg.define("puff = x")  # for now
 ureg.define("puffs = x")  # for now
+ureg.define("hit = x")  # for now
+ureg.define("hits = x")  # for now
 
 ureg.define("B = 10**9 * x")  # for noting billions of CFU, for example
 
