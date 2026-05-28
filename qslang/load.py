@@ -323,13 +323,16 @@ def _extend_substance_abbrs(events) -> list[Event]:
     return events
 
 
+# Units whose plural form should share an inference key with the singular,
+# so e.g. "1 serving" and "2 servings" land in the same bucket. An explicit
+# allowlist avoids mangling units that legitimately end in 's'.
+_UNIT_PLURALS = {"cups": "cup", "servings": "serving", "puffs": "puff", "hits": "hit"}
+
+
 def _norm_unit(unit: str) -> str:
-    """Normalize a unit for substance inference, collapsing simple plurals
-    (e.g. unit/units) so singular and plural share an inference key."""
+    """Map a unit to its inference key, collapsing known plurals onto the singular."""
     unit = unit.lower()
-    if len(unit) > 1 and unit.isalpha() and unit.endswith("s"):
-        unit = unit[:-1]
-    return unit
+    return _UNIT_PLURALS.get(unit, unit)
 
 
 def _clear_winner(counter: Counter, min_observations: int = 3) -> str | None:
@@ -355,9 +358,12 @@ def _infer_implicit_substances(events: list[Event]) -> list[Event]:
 
     The substance is inferred from the most common substance recorded with that
     unit (and ROA, when the entry specifies one). Inference only happens when
-    there's a clear winner; otherwise the entry is left unresolved and a warning
-    is logged. When a substance is inferred, the dominant ROA for that unit+substance
-    is also filled in if the entry didn't specify one.
+    there's a clear winner. When a substance is inferred, the dominant ROA for
+    that unit+substance is also filled in if the entry didn't specify one.
+
+    Entries that have no substance and for which none can be inferred are dropped
+    (with a warning): they carry no usable dose information and would otherwise
+    linger as ``substance=None`` "dose" events. Returns the filtered list.
     """
     # Build frequency maps from entries that have an explicit substance + unit.
     by_unit: dict[str, Counter] = defaultdict(Counter)
@@ -378,41 +384,49 @@ def _infer_implicit_substances(events: list[Event]) -> list[Event]:
 
     n_inferred = 0
     unresolved: Counter = Counter()
+    kept: list[Event] = []
     for e in events:
+        # Anything that isn't a substance-less dose passes through untouched.
         if e.type != "dose" or e.substance:
+            kept.append(e)
             continue
+
         dose = e.data.get("dose", {})
         unit = dose.get("unit")
-        if not unit or unit == "unknown":
-            continue
-        unit = _norm_unit(unit)
-        roa = dose.get("roa")
+        key = _norm_unit(unit) if unit and unit != "unknown" else None
 
         winner = None
-        if roa and (unit, roa) in by_unit_roa:
-            winner = _clear_winner(by_unit_roa[(unit, roa)])
-        if winner is None:
-            winner = _clear_winner(by_unit[unit])
-        if winner is None:
-            unresolved[unit] += 1
-            continue
+        if key is not None:
+            roa = dose.get("roa")
+            if roa and (key, roa) in by_unit_roa:
+                winner = _clear_winner(by_unit_roa[(key, roa)])
+            if winner is None:
+                winner = _clear_winner(by_unit[key])
 
+        if winner is None:
+            unresolved[unit or "unknown"] += 1
+            continue  # drop: no substance and none could be inferred
+
+        assert key is not None  # a winner implies a usable unit key
         e.data["substance"] = winner
         e.data["implicit_substance"] = True
-        if not roa:
-            roa_winner = _clear_winner(roa_by_unit_sub[(unit, winner)])
+        if not dose.get("roa"):
+            roa_winner = _clear_winner(roa_by_unit_sub[(key, winner)])
             if roa_winner:
                 dose["roa"] = roa_winner
         n_inferred += 1
+        kept.append(e)
 
     if n_inferred:
         logger.info(f"Inferred substance for {n_inferred} unit-only dose entries")
-    for unit, n in unresolved.most_common():
+    n_dropped = sum(unresolved.values())
+    if n_dropped:
+        breakdown = ", ".join(f"{n}x '{u}'" for u, n in unresolved.most_common())
         logger.warning(
-            f"Could not infer substance for {n} unit-only entries with unit '{unit}' "
-            "(no clear winner)"
+            f"Dropped {n_dropped} dose entries with no substance and no clear "
+            f"inference ({breakdown})"
         )
-    return events
+    return kept
 
 
 def test_load_events():
