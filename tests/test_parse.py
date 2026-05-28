@@ -104,6 +104,34 @@ def test_parse_event():
     print(parse(s))
 
 
+def test_parse_unit_only():
+    # An amount + unit with no named substance parses as a dose with substance=None
+    # (the substance is inferred later, see load._infer_implicit_substances)
+    parsed = parse("14:00 - 1 serving")
+    assert len(parsed) == 1
+    assert parsed[0].type == "dose"
+    assert parsed[0].substance is None
+    assert parsed[0].data["dose"] == {"amount": 1, "unit": "serving"}
+
+
+def test_parse_unit_only_approx():
+    parsed = parse("19:00 - ~2x")
+    assert len(parsed) == 1
+    assert parsed[0].type == "dose"
+    assert parsed[0].substance is None
+    assert parsed[0].data["dose"]["unit"] == "x"
+    assert parsed[0].data["dose"]["amount"] == 2
+    assert parsed[0].data["dose"]["approx"] is True
+
+
+def test_parse_percent_approx():
+    # An approximate percentage note inside parens (e.g. "~5%") should parse
+    parsed = parse("19:00 - 4cl Drink (~5%)")
+    assert len(parsed) == 1
+    assert parsed[0].substance == "Drink"
+    assert parsed[0].data["notes"] == [{"note": "~5%"}]
+
+
 def test_parse_alcohol():
     s = "# 2020-01-01\n18:30 - 4cl Gin (Tanqueray, 47%)"
     parsed = parse(s)
