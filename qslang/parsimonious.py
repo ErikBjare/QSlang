@@ -60,22 +60,23 @@ grammar = parsimonious.Grammar(
     ws          = ~"[ ]*"
     nl          = ~"\n+"
 
-    dose        = patient? ws amount ws substance ws extra? ws roa?
+    dose        = patient? ws amount ws substance? ws extra? ws roa?
     dose_list   = dose (ws "+" ws dose)*
     patient     = "{" ~"[a-z]+"i "}"
     amount      = (unknown ws unit?) / (approx? fraction ws unit?) / (approx? number ws unit?)
     number      = ~"[0-9]+[.]?[0-9]*"
     unit        = prefixlessunit / (siprefix? baseunit)
-    prefixlessunit = "cup" / "x" / "IU" / "GDU" / "B" / "serving" / ~"puff(s)?"
+    prefixlessunit = "cup" / "x" / "IU" / "GDU" / "B" / "serving" / ~"puffs?" / ~"hits?"
     siprefix    = "n" / "u" / "mc" / "m" / "c" / "d"
     baseunit    = "g" / "l"
     substance   = ~"[a-z0-9\-äåö]+"i (ws !roa ~"[a-z0-9\-åäö]+"i)*
     extra       = "(" extra_data (ws "," ws extra_data)* ")"
-    extra_data  = percent / dose_list / short_note
+    extra_data  = percent / ratio_note / dose_list / short_note
+    ratio_note  = ratio (ws ~"[^,)+\n]+"i)?
     short_note  = ratio? ws ~"[A-Z][^,)\n]+"i?
     ratio       = ~"[0-9]+:[0-9]+"
     fraction    = ~"[0-9]+\/[0-9]+"
-    percent     = ~"[>]"? number "%" ws substance?
+    percent     = approx? ~"[>]"? number "%" ws substance?
     roa         = "oral" / ~"vap(ed|orized)?" / "intranasal" / ~"insuff(lated)?" / ~"subcut(aneous)?" / ~"subl(ingual)?" / "smoked" / "spliff" / "inhaled" / "buccal" / "rectal"
 
     approx = "~"
@@ -259,7 +260,12 @@ class Visitor(NodeVisitor):
         patient, _, dose, _, substance, a1, extras, a2, roa = visited_children
         assert a1 is None
         assert a2 is None
-        d = {
+        # `substance` is optional in the grammar: an entry can be just an amount
+        # and a unit with no named substance, so it arrives as a list with 0 or 1
+        # elements. None means the substance is implicit and is inferred later
+        # from the unit (see load._infer_implicit_substances).
+        substance = substance[0] if substance else None
+        d: dict[str, Any] = {
             "substance": substance,
             "dose": {**dose},
             "subdoses": [],
@@ -308,6 +314,9 @@ class Visitor(NodeVisitor):
         return {"note": node.text}
 
     def visit_short_note(self, node, visited_children) -> dict:
+        return {"note": node.text}
+
+    def visit_ratio_note(self, node, visited_children) -> dict:
         return {"note": node.text}
 
     def visit_ratio(self, node, visited_children) -> str:
