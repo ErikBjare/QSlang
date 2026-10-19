@@ -13,6 +13,7 @@ from typing import Literal
 from .config import load_config
 from .event import Event
 from .filter import filter_events
+from .openelfbar import SUBSTANCE, load_device_hours, merge_device_events
 from .parsimonious import parse_defer_errors
 from .preprocess import _alcohol_preprocess
 
@@ -32,7 +33,12 @@ def load_events(
     substances: list[str] = [],
     sources: None
     | (
-        list[Literal["standardnotes"] | Literal["evernote"] | Literal["example"]]
+        list[
+            Literal["standardnotes"]
+            | Literal["evernote"]
+            | Literal["example"]
+            | Literal["openelfbar"]
+        ]
     ) = None,
 ) -> list[Event]:
     """
@@ -42,6 +48,7 @@ def load_events(
     - standardnotes
     - evernote
     - example
+    - openelfbar (device-tracked nicotine vaping, see qslang.openelfbar)
 
     If set to None, all sources will be attempted.
     """
@@ -62,15 +69,20 @@ def load_events(
         logger.info(f"Loaded {len(new_events)} from evernote")
         events += new_events
 
-    if not events:
+    # a device-only load shouldn't pull in example notes
+    device_only = sources is not None and set(sources) <= {"openelfbar"}
+    if not events and not device_only:
         logger.warning("No events found, falling back to example data")
-    if not events or (sources and "example" in sources):
+    if (not events and not device_only) or (sources and "example" in sources):
         new_events = notes_to_events(_load_example_notes())
         logger.info(f"Loaded {len(new_events)} from example data")
         events += new_events
 
     events = _extend_substance_abbrs(events)
     events = _infer_implicit_substances(events)
+    # after inference, so device puffs don't sway what bare "puff" entries resolve to
+    if sources is None or "openelfbar" in sources:
+        events = _merge_openelfbar(events)
     events = _tag_substances(events)
     events = sorted(events)
     events = filter_events(events, start, end, substances)
@@ -136,6 +148,27 @@ def _get_notes_dir() -> Path | None:
     if p is None:
         return None
     return Path(p).expanduser()
+
+
+def _merge_openelfbar(events: list[Event]) -> list[Event]:
+    config = load_config()
+    data = config.get("data", {})
+    p = data.get("openelfbar", None)
+    if p is None:
+        return events
+    path = Path(p).expanduser()
+    if not path.exists():
+        logger.warning(f"OpenElfbar database not found at {path}")
+        return events
+    hours = load_device_hours(
+        path, tz=data.get("openelfbar_timezone", "Europe/Stockholm")
+    )
+    # match the alias target manual nicotine entries were renamed to
+    aliases_inv = {
+        v.lower(): k for k, vs in _load_substance_aliases().items() for v in vs
+    }
+    substance = aliases_inv.get(SUBSTANCE.lower(), SUBSTANCE)
+    return merge_device_events(events, hours, substance=substance)
 
 
 def _get_export_file() -> Path | None:
@@ -306,7 +339,7 @@ def _tag_substances(events: list[Event]) -> list[Event]:
     n_categorized = len([e for e in events if e.tags])
     frac_categorized = n_categorized / n_doses if events else 0.0
     logger.info(
-        f"Categorized {n_categorized} out of {n_doses} doses ({round(frac_categorized*100, 1)}%)"
+        f"Categorized {n_categorized} out of {n_doses} doses ({round(frac_categorized * 100, 1)}%)"
     )
     return events
 
