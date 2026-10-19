@@ -7,6 +7,11 @@ from qslang.load import _infer_implicit_substances
 from qslang.openelfbar import load_device_hours, merge_device_events
 
 
+def _has(events: list[Event], e: Event) -> bool:
+    # Event equality ignores data, so compare identity
+    return any(x is e for x in events)
+
+
 def _write_db(path: Path, syncs: dict[str, dict[tuple[str, int], float]]) -> None:
     """syncs: started_at (UTC ISO) -> {(day_label, hour): puffs}"""
     conn = sqlite3.connect(path)
@@ -87,10 +92,10 @@ def test_merge_replaces_manual_vaped_nicotine_in_covered_hours(tmp_path: Path):
         [manual_covered, manual_uncovered, snus, cannabis], hours
     )
 
-    assert manual_covered not in result
-    assert manual_uncovered in result
-    assert snus in result
-    assert cannabis in result
+    assert not _has(result, manual_covered)
+    assert _has(result, manual_uncovered)
+    assert _has(result, snus)
+    assert _has(result, cannabis)
     device = [e for e in result if e.data.get("source") == "openelfbar"]
     # only hours with puffs become events
     assert len(device) == 1
@@ -116,3 +121,45 @@ def test_device_events_dont_sway_bare_puff_inference(tmp_path: Path):
     events = merge_device_events(events, load_device_hours(path))
     bare = [e for e in events if e.data.get("implicit_substance")]
     assert len(bare) == 1 and bare[0].substance == "Cannabis oil"
+
+
+def test_merge_matches_vaping_spellings_and_skips_patients(tmp_path: Path):
+    path = tmp_path / "openelfbar.db"
+    _write_db(path, {"2026-03-03T11:30:00.000Z": {("yesterday", 18): 37}})
+    hours = load_device_hours(path)
+    ts = datetime(2026, 3, 2, 18, 30)
+    vaporized = _dose(ts, "Nicotine", roa="vaporized")
+    vap = _dose(ts, "Nicotine", roa="vap")
+    other_person = _dose(ts, "Nicotine", roa="vaped")
+    other_person.data["patient"] = "alice"
+
+    result = merge_device_events([vaporized, vap, other_person], hours)
+
+    assert not _has(result, vaporized)
+    assert not _has(result, vap)
+    assert _has(result, other_person)
+
+
+def test_merge_uses_alias_target(tmp_path: Path):
+    path = tmp_path / "openelfbar.db"
+    _write_db(path, {"2026-03-03T11:30:00.000Z": {("yesterday", 18): 37}})
+    manual = _dose(datetime(2026, 3, 2, 18, 30), "Nic", roa="vaped")
+
+    result = merge_device_events([manual], load_device_hours(path), substance="Nic")
+
+    assert not _has(result, manual)
+    assert [e.substance for e in result] == ["Nic"]
+
+
+def test_device_only_load_skips_example_notes(tmp_path: Path, monkeypatch):
+    from qslang import load as load_mod
+
+    path = tmp_path / "openelfbar.db"
+    _write_db(path, {"2026-03-03T11:30:00.000Z": {("yesterday", 18): 37}})
+    monkeypatch.setattr(
+        load_mod, "load_config", lambda: {"data": {"openelfbar": str(path)}}
+    )
+
+    events = load_mod.load_events(sources=["openelfbar"])
+
+    assert events and all(e.data.get("source") == "openelfbar" for e in events)

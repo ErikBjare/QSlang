@@ -33,6 +33,8 @@ DAY_OFFSETS = {"today": 0, "yesterday": 1, "two_days_ago": 2}
 DEFAULT_TIMEZONE = "Europe/Stockholm"
 SUBSTANCE = "Nicotine"
 ROA = "vaped"
+# every spelling the parser accepts for vaping (see `roa` in parsimonious.py)
+VAPING_ROAS = {"vap", "vaped", "vaporized"}
 
 
 @dataclass
@@ -97,24 +99,34 @@ def load_device_hours(path: Path, tz: str = DEFAULT_TIMEZONE) -> list[DeviceHour
     )
 
 
-def _is_manual_vaped_nicotine(e: Event) -> bool:
+def _is_manual_vaped_nicotine(e: Event, substance: str) -> bool:
     return (
         e.type == "dose"
-        and (e.substance or "").lower() == SUBSTANCE.lower()
-        and (e.data.get("dose") or {}).get("roa", "").lower() == ROA
+        and (e.substance or "").lower() == substance.lower()
+        and ((e.data.get("dose") or {}).get("roa") or "").lower() in VAPING_ROAS
         and e.data.get("source") != "openelfbar"
+        # doses logged for someone else ({name} prefix) aren't the device owner's
+        and "patient" not in e.data
     )
 
 
-def merge_device_events(events: list[Event], hours: list[DeviceHour]) -> list[Event]:
-    """Replace manual vaped-nicotine entries in device-covered hours with device events."""
+def merge_device_events(
+    events: list[Event], hours: list[DeviceHour], substance: str = SUBSTANCE
+) -> list[Event]:
+    """Replace manual vaped-nicotine entries in device-covered hours with device events.
+
+    ``substance`` is the name nicotine has after alias resolution, so device
+    events and the entries they replace share it.
+    """
     covered = {h.hour for h in hours}
 
     def in_covered_hour(e: Event) -> bool:
         return e.timestamp.replace(minute=0, second=0, microsecond=0) in covered
 
     kept = [
-        e for e in events if not (_is_manual_vaped_nicotine(e) and in_covered_hour(e))
+        e
+        for e in events
+        if not (_is_manual_vaped_nicotine(e, substance) and in_covered_hour(e))
     ]
     n_replaced = len(events) - len(kept)
 
@@ -123,7 +135,7 @@ def merge_device_events(events: list[Event], hours: list[DeviceHour]) -> list[Ev
         if h.puffs <= 0:
             continue
         data: dict[str, object] = {
-            "substance": SUBSTANCE,
+            "substance": substance,
             "dose": {"amount": h.puffs, "unit": "puffs", "roa": ROA},
             "source": "openelfbar",
             "device": h.device,
@@ -134,6 +146,6 @@ def merge_device_events(events: list[Event], hours: list[DeviceHour]) -> list[Ev
 
     logger.info(
         f"OpenElfbar: {len(device_events)} hourly events over {len(covered)} covered hours, "
-        f"replaced {n_replaced} manual '{SUBSTANCE} {ROA}' entries"
+        f"replaced {n_replaced} manual vaped '{substance}' entries"
     )
     return kept + device_events
