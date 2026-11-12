@@ -317,3 +317,19 @@ def test_parse_continue_on_err():
     # ensure that the day header is being tracked
     assert isinstance(entries[1], Event)
     assert entries[1].timestamp == datetime(2020, 1, 1, 9, 0)
+
+
+def test_load_dir_notes_extension_styles(tmp_path):
+    from qslang.load import _load_dir_notes
+
+    # Standard Notes plaintext backups: old ".txt" style and new "_txt" style
+    (tmp_path / "2026-10-09-cfb7.txt").write_text("09:00 - 100mg Caffeine\n")
+    (tmp_path / "2026-10-11-5e70_txt").write_text("09:00 - 100mg Caffeine\n")
+    (tmp_path / "2026-10-12-aaaa.md").write_text("09:00 - 100mg Caffeine\n")
+    (tmp_path / "Shopping list-1234_txt").write_text("milk\n")
+    notes = sorted(_load_dir_notes(tmp_path))
+    assert notes == [
+        "# 2026-10-09-cfb7\n\n09:00 - 100mg Caffeine\n",
+        "# 2026-10-11-5e70\n\n09:00 - 100mg Caffeine\n",
+        "# 2026-10-12-aaaa\n\n09:00 - 100mg Caffeine\n",
+    ]
