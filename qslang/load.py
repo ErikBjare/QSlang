@@ -237,8 +237,10 @@ def _load_dir_notes(path: Path) -> list[str]:
     However, it was repurposed as it generalizes well.
     """
     notes = []
-    for p in itertools.chain(path.glob("*.md"), path.glob("*.txt")):
-        title = p.name.split(".")[0]
+    # Standard Notes plaintext backups switched from "<title>-<id>.txt" to
+    # "<title>-<id>_txt" (no extension) around 2026-10-10; accept both.
+    for p in itertools.chain(*(path.glob(f"*{sep}{ext}") for sep in "._" for ext in ("md", "txt"))):
+        title = re.sub(r"_(md|txt)$", "", p.name.split(".")[0])
         if re_date.match(title):
             with open(p) as f:
                 text = f.read()
