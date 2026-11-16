@@ -339,3 +339,25 @@ def test_load_dir_notes_extension_styles(tmp_path):
 
     for note in notes:
         assert len([e for e in parse(note) if e.type == "dose"]) == 1
+
+
+def test_load_dir_notes_warns_on_skipped_date_files(tmp_path, caplog):
+    from qslang.load import _load_dir_notes
+
+    (tmp_path / "2026-11-01-abcd_txt").write_text("09:00 - 100mg Caffeine\n")
+    (tmp_path / "Shopping list-1234_txt").write_text("milk\n")
+    (tmp_path / "Shopping list-5678.rtf").write_text("eggs\n")
+
+    with caplog.at_level("WARNING", logger="qslang.load"):
+        assert len(_load_dir_notes(tmp_path)) == 1
+    assert not caplog.records
+
+    (tmp_path / "2026-11-02-ef01.rtf").write_text("09:00 - 100mg Caffeine\n")
+    (tmp_path / "2026-11-03-2345").write_text("09:00 - 100mg Caffeine\n")
+    with caplog.at_level("WARNING", logger="qslang.load"):
+        assert len(_load_dir_notes(tmp_path)) == 1
+    warnings = [r.getMessage() for r in caplog.records if r.levelname == "WARNING"]
+    assert len(warnings) == 1
+    assert "Skipped 2 date-titled file(s)" in warnings[0]
+    assert "2026-11-02-ef01.rtf" in warnings[0]
+    assert "2026-11-03-2345" in warnings[0]
