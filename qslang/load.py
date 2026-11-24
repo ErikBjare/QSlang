@@ -237,11 +237,13 @@ def _load_dir_notes(path: Path) -> list[str]:
     However, it was repurposed as it generalizes well.
     """
     notes = []
+    loaded: set[Path] = set()
     # Standard Notes plaintext backups switched from "<title>-<id>.txt" to
     # "<title>-<id>_txt" (no extension) around 2026-10-10; accept both.
     for p in itertools.chain(*(path.glob(f"*{sep}{ext}") for sep in "._" for ext in ("md", "txt"))):
         title = re.sub(r"_(md|txt)$", "", p.name.split(".")[0])
         if re_date.match(title):
+            loaded.add(p)
             with open(p) as f:
                 text = f.read()
                 # print(title)
@@ -254,7 +256,27 @@ def _load_dir_notes(path: Path) -> list[str]:
             logger.debug("Unknown note type")
             # print(entry["content"])
 
+    _warn_skipped_date_files(path, loaded)
     return notes
+
+
+def _warn_skipped_date_files(path: Path, loaded: set[Path]) -> None:
+    """Warn about date-titled files that no note pattern picked up.
+
+    A backup naming change otherwise makes new notes vanish silently
+    (see ErikBjare/QSlang#9).
+    """
+    skipped = sorted(
+        p.name
+        for p in path.iterdir()
+        if p.is_file() and re_date.match(p.name) and p not in loaded
+    )
+    if skipped:
+        examples = ", ".join(skipped[:3])
+        logger.warning(
+            f"Skipped {len(skipped)} date-titled file(s) in {path} that match no note pattern "
+            f"(*.md, *.txt, *_md, *_txt), e.g. {examples}"
+        )
 
 
 def _load_example_notes() -> list[str]:
